@@ -8,12 +8,11 @@ from pinecone import Pinecone
 load_dotenv('../.env')
 
 # === SETUP CLIENTS ===
-import streamlit as st
-
 def get_secret(key):
     try:
+        import streamlit as st
         return st.secrets[key]
-    except:
+    except Exception:
         return os.getenv(key)
 
 claude = anthropic.Anthropic(api_key=get_secret('ANTHROPIC_API_KEY'))
