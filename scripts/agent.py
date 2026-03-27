@@ -8,9 +8,17 @@ from pinecone import Pinecone
 load_dotenv('../.env')
 
 # === SETUP CLIENTS ===
-claude = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
-openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
-pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
+import streamlit as st
+
+def get_secret(key):
+    try:
+        return st.secrets[key]
+    except:
+        return os.getenv(key)
+
+claude = anthropic.Anthropic(api_key=get_secret('ANTHROPIC_API_KEY'))
+openai_client = OpenAI(api_key=get_secret('OPENAI_API_KEY'))
+pc = Pinecone(api_key=get_secret('PINECONE_API_KEY'))
 pinecone_index = pc.Index('atomic-habits-knowledge')
 
 # === CARICA FILES ===
