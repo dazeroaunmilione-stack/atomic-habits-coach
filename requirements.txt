@@ -1,0 +1,7 @@
+anthropic
+openai
+pinecone
+python-dotenv
+openpyxl
+PyMuPDF
+streamlit
