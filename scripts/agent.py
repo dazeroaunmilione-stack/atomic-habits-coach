@@ -1,0 +1,223 @@
+import os
+import json
+from dotenv import load_dotenv
+import anthropic
+from openai import OpenAI
+from pinecone import Pinecone
+
+load_dotenv('../.env')
+
+# === SETUP CLIENTS ===
+claude = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
+pinecone_index = pc.Index('atomic-habits-knowledge')
+
+# === CARICA FILES ===
+with open('../output/bdm_pre_gate.json', 'r', encoding='utf-8') as f:
+    BDM_PRE = json.load(f)
+
+with open('../output/bdm_post_gate.json', 'r', encoding='utf-8') as f:
+    BDM_POST = json.load(f)
+
+with open('system_prompt.txt', 'r', encoding='utf-8') as f:
+    SYSTEM_PROMPT = f.read()
+
+# === STATO SESSIONE ===
+session = {
+    'gate': 0,           # 0=primo turno, 1=inquiry, 2=post-inquiry, 3=post-microgate
+    'conversation': [],  # storia conversazione
+    'areas_status': {},  # stato delle 5 aree
+    'diagnosis': None,   # diagnosi corrente
+    'retrieval_done': False
+}
+
+# === FUNZIONI RETRIEVAL ===
+
+def get_embedding(text):
+    response = openai_client.embeddings.create(
+        model="text-embedding-3-small",
+        input=text[:8000]
+    )
+    return response.data[0].embedding
+
+def retrieve_modules(query, top_k=5, filter_metadata=None):
+    """Retrieval semantico post-microgate"""
+    embedding = get_embedding(query)
+    results = pinecone_index.query(
+        vector=embedding,
+        top_k=top_k,
+        include_metadata=True,
+        filter=filter_metadata
+    )
+    return results.matches
+
+def retrieve_modules_paired(dominant_query, rival_query, top_k=3):
+    """Retrieval a coppia: moduli per tesi dominante + moduli per mettere alla prova la rivale"""
+    dominant = retrieve_modules(dominant_query, top_k)
+    rival = retrieve_modules(rival_query, top_k)
+    return dominant, rival
+
+def format_bdm_for_prompt(gate_level):
+    """Restituisce BDM formattato in base al gate corrente"""
+    if gate_level < 2:
+        return ""
+    
+    if gate_level == 2:
+        # Solo campi pre-gate: pattern + sintomi + segnali di esclusione
+        lines = ["=== PATTERN DIAGNOSTICI DISPONIBILI (pre-gate) ==="]
+        for p in BDM_PRE:
+            lines.append(f"\n{p['diagnosis_id']}: {p['problem_pattern']}")
+            lines.append(f"  Sintomo: {p['symptom_description']}")
+            if p.get('disconfirming_signals'):
+                lines.append(f"  Esclude: {p['disconfirming_signals']}")
+        return '\n'.join(lines)
+    
+    if gate_level >= 3:
+        # Tutti i campi post-gate
+        lines = ["=== GUIDA DIAGNOSTICA COMPLETA (post-gate) ==="]
+        for p in BDM_POST:
+            lines.append(f"\n{p['diagnosis_id']}: {p['problem_pattern']}")
+            lines.append(f"  Fase: {p.get('likely_behavior_phase', '')}")
+            lines.append(f"  Causa: {p.get('likely_root_cause', '')}")
+            lines.append(f"  Tecniche: {p.get('recommended_techniques', '')}")
+            lines.append(f"  Moduli: {p.get('recommended_modules', '')}")
+        return '\n'.join(lines)
+
+def format_retrieved_modules(matches):
+    """Formatta i moduli recuperati per includerli nel prompt"""
+    if not matches:
+        return ""
+    lines = ["=== MODULI KNOWLEDGE BASE RECUPERATI ==="]
+    for m in matches:
+        meta = m.metadata
+        lines.append(f"\nModulo {meta.get('module_id')}: {meta.get('module_title')}")
+        lines.append(f"  Dominio: {meta.get('primary_domain')} | Fase: {meta.get('behavior_change_stage')}")
+        lines.append(f"  Contenuto: {meta.get('text_preview', '')[:400]}")
+    return '\n'.join(lines)
+
+# === LOGICA DI GATE ===
+
+def check_gate_advancement(user_message):
+    """
+    Analizza la conversazione e decide se avanzare di gate.
+    Implementazione semplificata: Claude stesso valuta lo stato delle aree.
+    """
+    if session['gate'] == 0:
+        # Dopo il primo turno con 5 domande, passa a gate 1
+        session['gate'] = 1
+        return
+    
+    if session['gate'] == 1:
+        # Conta quante risposte sostanziali sono arrivate
+        user_turns = [m for m in session['conversation'] if m['role'] == 'user']
+        if len(user_turns) >= 2:  # almeno una risposta alle 5 domande
+            session['gate'] = 2
+    
+    # Il passaggio da gate 2 a gate 3 (micro-gate) viene gestito da Claude stesso
+    # tramite una keyword speciale nel suo ragionamento interno
+
+# === COSTRUZIONE PROMPT PER TURNO ===
+
+def build_messages(user_input):
+    """Costruisce la lista messaggi con contesto di gate appropriato"""
+    
+    # Aggiungi contesto di gate al system prompt
+    gate_context = f"\n\n=== STATO CORRENTE SESSIONE ===\nGate attivo: {session['gate']}\n"
+    
+    if session['gate'] == 2:
+        gate_context += "\nHai accesso al BDM pre-gate. Puoi usarlo per shortlist diagnostica ma NON per prescrivere tecniche.\n"
+        gate_context += format_bdm_for_prompt(2)
+    
+    if session['gate'] >= 3:
+        gate_context += "\nMicro-gate superato. Hai accesso a BDM completo e Knowledge base.\n"
+        gate_context += format_bdm_for_prompt(3)
+        
+        if not session['retrieval_done'] and session.get('diagnosis'):
+            # Esegui retrieval a coppia
+            dominant_query = session['diagnosis'].get('dominant', user_input)
+            rival_query = session['diagnosis'].get('rival', user_input)
+            dominant_modules, rival_modules = retrieve_modules_paired(dominant_query, rival_query)
+            session['retrieval_done'] = True
+            session['retrieved_modules'] = {
+                'dominant': dominant_modules,
+                'rival': rival_modules
+            }
+        
+        if session.get('retrieved_modules'):
+            gate_context += "\n" + format_retrieved_modules(session['retrieved_modules']['dominant'])
+            gate_context += "\n=== MODULI PER TESTARE IPOTESI RIVALE ===\n"
+            gate_context += format_retrieved_modules(session['retrieved_modules']['rival'])
+    
+    full_system = SYSTEM_PROMPT + gate_context
+    
+    # Aggiungi il messaggio corrente
+    messages = session['conversation'].copy()
+    messages.append({'role': 'user', 'content': user_input})
+    
+    return full_system, messages
+
+# === LOOP PRINCIPALE ===
+
+def chat(user_input):
+    """Singolo turno di conversazione"""
+    
+    check_gate_advancement(user_input)
+    
+    system, messages = build_messages(user_input)
+    
+    response = claude.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=2048,
+        system=system,
+        messages=messages
+    )
+    
+    assistant_reply = response.content[0].text
+    
+    # Aggiorna storia
+    session['conversation'].append({'role': 'user', 'content': user_input})
+    session['conversation'].append({'role': 'assistant', 'content': assistant_reply})
+    
+    # Rileva se Claude ha segnalato il superamento del micro-gate
+    if 'MICRO-GATE-SUPERATO' in assistant_reply or session['gate'] == 2:
+        if len(session['conversation']) >= 6:  # conversazione sufficientemente avanzata
+            session['gate'] = 3
+    
+    return assistant_reply
+
+# === INTERFACCIA CHAT ===
+
+if __name__ == '__main__':
+    print("=" * 60)
+    print("ATOMIC HABITS AI COACH")
+    print("Sistema di behavior change basato su Atomic Habits")
+    print("Digita 'quit' per uscire | 'reset' per nuovo caso")
+    print("=" * 60)
+    print()
+    
+    while True:
+        try:
+            user_input = input("Tu: ").strip()
+            
+            if not user_input:
+                continue
+            if user_input.lower() == 'quit':
+                print("Sessione terminata.")
+                break
+            if user_input.lower() == 'reset':
+                session['conversation'] = []
+                session['gate'] = 0
+                session['retrieval_done'] = False
+                session['retrieved_modules'] = None
+                print("\n[Sessione resettata — nuovo caso]\n")
+                continue
+            
+            print(f"\nCoach: ", end='')
+            reply = chat(user_input)
+            print(reply)
+            print(f"\n[Gate corrente: {session['gate']}]\n")
+            
+        except KeyboardInterrupt:
+            print("\nInterrotto.")
+            break
