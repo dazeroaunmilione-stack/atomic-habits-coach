@@ -37,10 +37,7 @@ with open(os.path.join(BASE_DIR, 'system_prompt.txt'), 'r', encoding='utf-8') as
     SYSTEM_PROMPT = f.read()
 
 # === SESSIONE PER-UTENTE ===
-# La sessione è isolata per ogni utente tramite st.session_state.
-# In modalità CLI (python agent.py), usa un dizionario locale.
-
-_CLI_SESSION = None  # usato solo in modalità CLI
+_CLI_SESSION = None
 
 def _default_session() -> dict:
     return {
@@ -53,11 +50,6 @@ def _default_session() -> dict:
     }
 
 def get_session() -> dict:
-    """
-    Restituisce la sessione corrente.
-    - In Streamlit: usa st.session_state (isolata per utente)
-    - In CLI: usa variabile locale globale
-    """
     try:
         import streamlit as st
         if 'ah_session' not in st.session_state:
@@ -70,7 +62,6 @@ def get_session() -> dict:
         return _CLI_SESSION
 
 def reset_session():
-    """Resetta la sessione corrente."""
     try:
         import streamlit as st
         st.session_state['ah_session'] = _default_session()
@@ -78,26 +69,15 @@ def reset_session():
         global _CLI_SESSION
         _CLI_SESSION = _default_session()
 
-# Alias per retrocompatibilità con app.py che importa `session`
-# In Streamlit, `session` punta sempre alla sessione dell'utente corrente
-# tramite get_session(). Non è più un dict globale condiviso.
 class _SessionProxy:
-    """
-    Proxy trasparente che delega tutte le operazioni a get_session().
-    Permette di usare `session['key']` senza modificare app.py.
-    """
     def __getitem__(self, key):
         return get_session()[key]
-
     def __setitem__(self, key, value):
         get_session()[key] = value
-
     def __contains__(self, key):
         return key in get_session()
-
     def get(self, key, default=None):
         return get_session().get(key, default)
-
     def __repr__(self):
         return repr(get_session())
 
@@ -388,23 +368,52 @@ def build_messages(user_input):
 
     return full_system, messages
 
+# === MESSAGGI DI ERRORE ===
+
+_ERROR_MESSAGES = {
+    'api': "Il Coach non è disponibile in questo momento. Riprova tra qualche secondo.",
+    'timeout': "La risposta sta impiegando troppo tempo. Riprova.",
+    'overload': "Il servizio è temporaneamente sovraccarico. Attendi un momento e riprova.",
+    'generic': "Si è verificato un problema temporaneo. Riprova."
+}
+
 # === LOOP PRINCIPALE ===
 
 def chat(user_input):
     s = get_session()
 
-    check_gate_advancement(user_input)
+    try:
+        check_gate_advancement(user_input)
+    except Exception as e:
+        print(f"[gate] Errore: {e}")
 
-    system, messages = build_messages(user_input)
+    try:
+        system, messages = build_messages(user_input)
+    except Exception as e:
+        print(f"[build_messages] Errore: {e}")
+        return _ERROR_MESSAGES['generic']
 
-    response = claude.messages.create(
-        model="claude-sonnet-4-5",
-        max_tokens=4096,
-        system=system,
-        messages=messages
-    )
+    try:
+        response = claude.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=4096,
+            system=system,
+            messages=messages
+        )
+        assistant_reply = response.content[0].text
+    except anthropic.APITimeoutError:
+        return _ERROR_MESSAGES['timeout']
+    except anthropic.APIConnectionError:
+        return _ERROR_MESSAGES['api']
+    except anthropic.RateLimitError:
+        return _ERROR_MESSAGES['overload']
+    except anthropic.APIStatusError as e:
+        print(f"[claude API] Errore {e.status_code}: {e.message}")
+        return _ERROR_MESSAGES['api']
+    except Exception as e:
+        print(f"[chat] Errore inatteso: {e}")
+        return _ERROR_MESSAGES['generic']
 
-    assistant_reply = response.content[0].text
     assistant_reply = strip_process_blocks(assistant_reply)
 
     s['conversation'].append({'role': 'user', 'content': user_input})
