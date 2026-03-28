@@ -20,21 +20,10 @@ html, body, [data-testid="stAppViewContainer"] {
     font-family: 'DM Sans', sans-serif;
 }
 
-[data-testid="stAppViewContainer"] {
-    background: #F8F7F5 !important;
-}
-
-[data-testid="stHeader"] {
-    background: transparent !important;
-    border: none !important;
-}
-
-/* ─── HIDE STREAMLIT DEFAULTS ──────────────────────────────── */
+[data-testid="stHeader"] { background: transparent !important; border: none !important; }
 #MainMenu, footer, header { visibility: hidden; }
 [data-testid="stToolbar"] { display: none; }
 .stDeployButton { display: none; }
-
-/* ─── HIDE SIDEBAR ─────────────────────────────────────────── */
 [data-testid="stSidebar"] { display: none !important; }
 [data-testid="collapsedControl"] { display: none !important; }
 
@@ -59,9 +48,7 @@ html, body, [data-testid="stAppViewContainer"] {
     color: #888 !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
-    white-space: nowrap !important;
 }
-
 .stButton > button:hover {
     border-color: #C4A35A !important;
     color: #C4A35A !important;
@@ -73,7 +60,6 @@ html, body, [data-testid="stAppViewContainer"] {
     padding: 3rem 0 2.5rem 0;
     margin-bottom: 0.5rem;
 }
-
 .coach-title {
     font-family: 'Cormorant Garamond', serif;
     font-size: 3.8rem;
@@ -83,21 +69,14 @@ html, body, [data-testid="stAppViewContainer"] {
     line-height: 1.1;
     margin-bottom: 0.7rem;
 }
-
-.coach-title strong {
-    font-weight: 600;
-    color: #C4A35A;
-}
-
+.coach-title strong { font-weight: 600; color: #C4A35A; }
 .coach-subtitle {
-    font-family: 'DM Sans', sans-serif;
     font-size: 0.75rem;
     font-weight: 400;
-    color: #7A7570 !important; /* più scuro */
+    color: #7A7570;
     letter-spacing: 0.18em;
     text-transform: uppercase;
 }
-
 .header-divider {
     width: 40px;
     height: 1px;
@@ -108,104 +87,77 @@ html, body, [data-testid="stAppViewContainer"] {
 /* ─── EMPTY STATE ──────────────────────────────────────────── */
 .empty-state {
     text-align: center;
-    padding: 2rem 2rem 1.5rem 2rem;
+    padding: 2.5rem 2rem;
 }
-
 .empty-state .icon {
     font-size: 1.6rem;
     margin-bottom: 0.8rem;
     opacity: 0.3;
     color: #C4A35A;
 }
-
 .empty-state p {
-    font-family: 'DM Sans', sans-serif;
     font-size: 0.82rem;
     font-weight: 400;
     line-height: 1.8;
-    color: #8A847C !important; /* più scuro */
+    color: #8A847C;
     max-width: 300px;
     margin: 0 auto;
 }
 
-/* ─── HIDE DEFAULT AVATARS ─────────────────────────────────── */
-[data-testid="chatAvatarIcon-user"],
-[data-testid="chatAvatarIcon-assistant"] {
-    display: none !important;
+/* ─── CUSTOM CHAT MESSAGES ─────────────────────────────────── */
+.msg-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    margin-bottom: 0.9rem;
 }
+.msg-row.user { flex-direction: row-reverse; }
 
-/* ─── CHAT MESSAGES ────────────────────────────────────────── */
-[data-testid="stChatMessage"] {
-    background: transparent !important;
-    border: none !important;
-    padding: 0.3rem 0 !important;
-    margin-bottom: 0.6rem !important;
-    gap: 0.6rem !important;
-}
-
-/* Avatar custom — utente */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"])::before {
-    content: "U";
+/* Avatar */
+.avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    border-radius: 50%;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+.avatar-user {
     background: #2C2C2C;
     color: #C4A35A;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    flex-shrink: 0;
-}
-
-/* Avatar custom — coach */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"])::before {
-    content: "◈";
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #C4A35A, #E8C97A);
-    color: #fff;
     font-size: 0.7rem;
-    flex-shrink: 0;
+    letter-spacing: 0.05em;
+}
+.avatar-coach {
+    background: linear-gradient(135deg, #C4A35A, #E8C97A);
+    color: #FFFFFF;
+    font-size: 0.65rem;
 }
 
-/* Bubble utente */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMarkdown {
-    background: #2C2C2C !important;
-    color: #F0EDE8 !important;
-    border-radius: 20px 20px 4px 20px !important;
-    padding: 0.85rem 1.15rem !important;
-    max-width: 76% !important;
-    font-size: 0.88rem !important;
-    line-height: 1.6 !important;
-    margin-left: auto !important;
+/* Bubble */
+.bubble {
+    max-width: 78%;
+    padding: 0.85rem 1.15rem;
+    font-size: 0.88rem;
+    line-height: 1.72;
+    font-family: 'DM Sans', sans-serif;
 }
-
-/* Bubble coach */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown {
-    background: #FFFFFF !important;
-    color: #2C2C2C !important;
-    border-radius: 20px 20px 20px 4px !important;
-    padding: 1rem 1.3rem !important;
-    max-width: 84% !important;
-    font-size: 0.88rem !important;
-    line-height: 1.75 !important;
-    border: 1px solid #E8E4DC !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
+.bubble-user {
+    background: #2C2C2C;
+    color: #F0EDE8;
+    border-radius: 20px 20px 4px 20px;
 }
-
-/* testo dentro le bubble sempre visibile */
-[data-testid="stChatMessage"] .stMarkdown p,
-[data-testid="stChatMessage"] .stMarkdown li,
-[data-testid="stChatMessage"] .stMarkdown strong {
-    color: inherit !important;
+.bubble-coach {
+    background: #FFFFFF;
+    color: #2C2C2C;
+    border-radius: 20px 20px 20px 4px;
+    border: 1px solid #E8E4DC;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
 }
 
 /* ─── CHAT INPUT ───────────────────────────────────────────── */
@@ -225,7 +177,6 @@ html, body, [data-testid="stAppViewContainer"] {
     box-shadow: none !important;
     outline: none !important;
 }
-
 [data-testid="stChatInput"] > div {
     max-width: 520px !important;
     width: 100% !important;
@@ -236,14 +187,12 @@ html, body, [data-testid="stAppViewContainer"] {
     box-shadow: none !important;
     outline: none !important;
 }
-
 [data-testid="stChatInput"] div {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     outline: none !important;
 }
-
 [data-testid="stChatInput"] textarea {
     background: #FFFFFF !important;
     border: 1px solid #E0DBD3 !important;
@@ -252,38 +201,33 @@ html, body, [data-testid="stAppViewContainer"] {
     font-family: 'DM Sans', sans-serif !important;
     font-size: 0.86rem !important;
     color: #2C2C2C !important;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
     box-shadow: 0 2px 14px rgba(0,0,0,0.05) !important;
     resize: none !important;
     outline: none !important;
+    transition: border-color 0.2s ease !important;
 }
-
 [data-testid="stChatInput"] textarea:focus {
     border-color: #C4A35A !important;
     outline: none !important;
-    box-shadow: 0 0 0 3px rgba(196, 163, 90, 0.1), 0 2px 14px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 0 0 3px rgba(196,163,90,0.1) !important;
 }
-
 [data-testid="stChatInput"] textarea::placeholder {
-    color: #7A7570 !important; /* più scuro */
+    color: #7A7570 !important;
     font-style: italic !important;
     font-weight: 300 !important;
 }
-
 [data-testid="stChatInput"] button {
     background: #C4A35A !important;
     border: none !important;
     border-radius: 50% !important;
     color: white !important;
-    transition: all 0.2s ease !important;
     box-shadow: 0 2px 8px rgba(196,163,90,0.3) !important;
     outline: none !important;
+    transition: all 0.2s ease !important;
 }
-
 [data-testid="stChatInput"] button:hover {
     background: #2C2C2C !important;
     transform: scale(1.05) !important;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
 }
 
 /* ─── SPINNER ──────────────────────────────────────────────── */
@@ -300,7 +244,7 @@ html, body, [data-testid="stAppViewContainer"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── BOTTONE NUOVO CASO — top right ─────────────────────────────────────────
+# ─── TOP BAR ────────────────────────────────────────────────────────────────
 col1, col2 = st.columns([8, 2])
 with col2:
     if st.button("↺ Nuovo caso"):
@@ -334,17 +278,46 @@ if not st.session_state.messages:
         </div>
     """, unsafe_allow_html=True)
 
+# Rendering messaggi con HTML custom
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+    role = message["role"]
+    content = message["content"]
+    # Converti newline in <br> e asterischi bold
+    import re
+    content_html = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    content_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content_html)
+    content_html = content_html.replace("\n", "<br>")
 
+    if role == "user":
+        st.markdown(f"""
+        <div class="msg-row user">
+            <div class="avatar avatar-user">F</div>
+            <div class="bubble bubble-user">{content_html}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div class="msg-row">
+            <div class="avatar avatar-coach">◈</div>
+            <div class="bubble bubble-coach">{content_html}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# Input
 if prompt := st.chat_input("Descrivi il tuo caso..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    with st.chat_message("assistant"):
-        with st.spinner(""):
-            reply = chat(prompt)
-        st.markdown(reply)
+    # Mostra subito il messaggio utente
+    import re
+    p_html = prompt.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+    st.markdown(f"""
+    <div class="msg-row user">
+        <div class="avatar avatar-user">F</div>
+        <div class="bubble bubble-user">{p_html}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.spinner(""):
+        reply = chat(prompt)
+
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
