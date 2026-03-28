@@ -34,90 +34,54 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stToolbar"] { display: none; }
 .stDeployButton { display: none; }
 
-/* ─── SIDEBAR ──────────────────────────────────────────────── */
-[data-testid="stSidebar"] {
-    background: #FFFFFF !important;
-    border-right: 1px solid #E8E4DC !important;
-    padding: 2rem 1.5rem !important;
-    min-width: 220px !important;
-    max-width: 220px !important;
-}
-
-[data-testid="stSidebar"] > div:first-child {
-    padding: 0 !important;
-}
-
-.sidebar-logo {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 1.1rem;
-    font-weight: 500;
-    color: #1A1A1A;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 2.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid #E8E4DC;
-}
-
-.sidebar-logo span {
-    color: #C4A35A;
-}
-
-.sidebar-label {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #999;
-    margin-bottom: 2rem;
-}
-
-/* ─── SIDEBAR BUTTON ───────────────────────────────────────── */
-[data-testid="stSidebar"] .stButton > button {
-    width: 100% !important;
-    background: transparent !important;
-    border: 1px solid #C4A35A !important;
-    color: #C4A35A !important;
-    border-radius: 50px !important;
-    padding: 0.6rem 1.2rem !important;
-    font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.75rem !important;
-    font-weight: 500 !important;
-    letter-spacing: 0.1em !important;
-    text-transform: uppercase !important;
-    cursor: pointer !important;
-    transition: all 0.25s ease !important;
-    margin-top: 1rem !important;
-}
-
-[data-testid="stSidebar"] .stButton > button:hover {
-    background: #C4A35A !important;
-    color: #FFFFFF !important;
-}
+/* ─── HIDE SIDEBAR ─────────────────────────────────────────── */
+[data-testid="stSidebar"] { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
 
 /* ─── MAIN CONTAINER ───────────────────────────────────────── */
 .main .block-container {
-    max-width: 760px !important;
-    padding: 3rem 2rem 8rem 2rem !important;
+    max-width: 700px !important;
+    padding: 2rem 2rem 7rem 2rem !important;
     margin: 0 auto !important;
+}
+
+/* ─── NUOVO CASO BUTTON ────────────────────────────────────── */
+.stButton > button {
+    background: transparent !important;
+    border: 1px solid #E0DBD3 !important;
+    border-radius: 50px !important;
+    padding: 0.4rem 1rem !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.68rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    color: #B0A898 !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    white-space: nowrap !important;
+}
+
+.stButton > button:hover {
+    border-color: #C4A35A !important;
+    color: #C4A35A !important;
 }
 
 /* ─── HEADER ───────────────────────────────────────────────── */
 .coach-header {
     text-align: center;
-    padding: 3rem 0 2.5rem 0;
-    margin-bottom: 1rem;
+    padding: 1.5rem 0 2.5rem 0;
+    margin-bottom: 0.5rem;
 }
 
 .coach-title {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 2.6rem;
+    font-size: 3.8rem;
     font-weight: 300;
     color: #1A1A1A;
     letter-spacing: 0.04em;
     line-height: 1.1;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.7rem;
 }
 
 .coach-title strong {
@@ -127,10 +91,10 @@ html, body, [data-testid="stAppViewContainer"] {
 
 .coach-subtitle {
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 300;
-    color: #999;
-    letter-spacing: 0.15em;
+    color: #B0A898;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
 }
 
@@ -141,110 +105,132 @@ html, body, [data-testid="stAppViewContainer"] {
     margin: 1.2rem auto 0 auto;
 }
 
+/* ─── EMPTY STATE ──────────────────────────────────────────── */
+.empty-state {
+    text-align: center;
+    padding: 2rem 2rem 1.5rem 2rem;
+}
+
+.empty-state .icon {
+    font-size: 1.6rem;
+    margin-bottom: 0.8rem;
+    opacity: 0.25;
+    color: #C4A35A;
+}
+
+.empty-state p {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 300;
+    line-height: 1.8;
+    color: #C0B8AE;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
 /* ─── CHAT MESSAGES ────────────────────────────────────────── */
 [data-testid="stChatMessage"] {
     background: transparent !important;
     border: none !important;
-    padding: 0.4rem 0 !important;
-    margin-bottom: 0.5rem !important;
-}
-
-/* User messages */
-[data-testid="stChatMessage"][data-testid*="user"],
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    display: flex;
-    justify-content: flex-end;
+    padding: 0.3rem 0 !important;
+    margin-bottom: 0.4rem !important;
 }
 
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMarkdown {
     background: #1A1A1A !important;
     color: #F8F7F5 !important;
     border-radius: 20px 20px 4px 20px !important;
-    padding: 0.9rem 1.2rem !important;
-    max-width: 78% !important;
-    font-size: 0.9rem !important;
+    padding: 0.85rem 1.15rem !important;
+    max-width: 76% !important;
+    font-size: 0.88rem !important;
     line-height: 1.6 !important;
     margin-left: auto !important;
 }
 
-/* Assistant messages */
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown {
     background: #FFFFFF !important;
     color: #1A1A1A !important;
     border-radius: 20px 20px 20px 4px !important;
     padding: 1rem 1.3rem !important;
-    max-width: 86% !important;
-    font-size: 0.9rem !important;
-    line-height: 1.7 !important;
+    max-width: 84% !important;
+    font-size: 0.88rem !important;
+    line-height: 1.75 !important;
     border: 1px solid #EDEAE4 !important;
     box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
 }
 
-/* Avatar icons */
 [data-testid="chatAvatarIcon-user"] {
     background: #1A1A1A !important;
     border-radius: 50% !important;
     color: #C4A35A !important;
-    font-size: 0.7rem !important;
 }
 
 [data-testid="chatAvatarIcon-assistant"] {
     background: linear-gradient(135deg, #C4A35A, #E8C97A) !important;
     border-radius: 50% !important;
     color: #FFF !important;
-    font-size: 0.7rem !important;
 }
 
 /* ─── CHAT INPUT ───────────────────────────────────────────── */
 [data-testid="stChatInput"] {
     position: fixed !important;
     bottom: 0 !important;
-    left: 220px !important;
+    left: 0 !important;
     right: 0 !important;
-    background: rgba(248, 247, 245, 0.92) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border-top: 1px solid #E8E4DC !important;
-    padding: 1rem 2rem 1.2rem 2rem !important;
+    background: rgba(248, 247, 245, 0.94) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+    border-top: 1px solid #EAE7E1 !important;
+    padding: 0.9rem 0 1.1rem 0 !important;
     z-index: 999 !important;
+    display: flex !important;
+    justify-content: center !important;
+}
+
+[data-testid="stChatInput"] > div {
+    max-width: 560px !important;
+    width: 100% !important;
+    padding: 0 2rem !important;
 }
 
 [data-testid="stChatInput"] textarea {
     background: #FFFFFF !important;
     border: 1px solid #E0DBD3 !important;
     border-radius: 50px !important;
-    padding: 0.8rem 1.4rem !important;
+    padding: 0.75rem 1.3rem !important;
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.88rem !important;
+    font-size: 0.86rem !important;
     color: #1A1A1A !important;
-    transition: border-color 0.2s ease !important;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.05) !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+    box-shadow: 0 2px 14px rgba(0,0,0,0.05) !important;
     resize: none !important;
 }
 
 [data-testid="stChatInput"] textarea:focus {
     border-color: #C4A35A !important;
     outline: none !important;
-    box-shadow: 0 0 0 3px rgba(196, 163, 90, 0.12), 0 2px 16px rgba(0,0,0,0.05) !important;
+    box-shadow: 0 0 0 3px rgba(196, 163, 90, 0.1), 0 2px 14px rgba(0,0,0,0.05) !important;
 }
 
 [data-testid="stChatInput"] textarea::placeholder {
-    color: #B0A898 !important;
+    color: #C0B8AE !important;
     font-style: italic !important;
+    font-weight: 300 !important;
 }
 
-/* Send button */
 [data-testid="stChatInput"] button {
     background: #C4A35A !important;
     border: none !important;
     border-radius: 50% !important;
     color: white !important;
     transition: all 0.2s ease !important;
+    box-shadow: 0 2px 8px rgba(196,163,90,0.3) !important;
 }
 
 [data-testid="stChatInput"] button:hover {
     background: #1A1A1A !important;
     transform: scale(1.05) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
 }
 
 /* ─── SPINNER ──────────────────────────────────────────────── */
@@ -253,73 +239,23 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 /* ─── SCROLLBAR ────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #D8D3CA; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #C4A35A; }
 
-/* ─── EMPTY STATE ──────────────────────────────────────────── */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #B0A898;
-}
-
-.empty-state .icon {
-    font-size: 2rem;
-    margin-bottom: 1rem;
-    opacity: 0.4;
-}
-
-.empty-state p {
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
-    font-weight: 300;
-    line-height: 1.7;
-    color: #B0A898;
-    max-width: 320px;
-    margin: 0 auto;
-}
-
-/* ─── GATE INDICATOR ───────────────────────────────────────── */
-.gate-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    background: #FFFFFF;
-    border: 1px solid #E8E4DC;
-    border-radius: 50px;
-    padding: 0.3rem 0.8rem;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.65rem;
-    font-weight: 500;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #999;
-    margin-bottom: 2rem;
-}
-
-.gate-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #C4A35A;
-}
-
 </style>
 """, unsafe_allow_html=True)
 
-# ─── SIDEBAR ────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("""
-        <div class="sidebar-logo">Atomic<br><span>Habits</span> Coach</div>
-        <div class="sidebar-label">Sessione attiva</div>
-    """, unsafe_allow_html=True)
-
-    if st.button("↺  Nuovo caso"):
+# ─── TOP BAR con bottone Nuovo caso ─────────────────────────────────────────
+col1, col2 = st.columns([8, 2])
+with col2:
+    if st.button("↺ Nuovo caso"):
         session['conversation'] = []
         session['gate'] = 0
         session['retrieval_done'] = False
+        if 'retrieved_modules' in session:
+            session['retrieved_modules'] = None
         st.session_state.messages = []
         st.rerun()
 
