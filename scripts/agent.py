@@ -6,7 +6,7 @@ import anthropic
 from openai import OpenAI
 from pinecone import Pinecone
 
-# === PATH ASSOLUTI (funziona sia in locale che su Streamlit Cloud) ===
+# === PATH ASSOLUTI ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, '..', 'output')
 ENV_PATH = os.path.join(BASE_DIR, '..', '.env')
@@ -36,25 +36,72 @@ with open(os.path.join(OUTPUT_DIR, 'bdm_post_gate.json'), 'r', encoding='utf-8')
 with open(os.path.join(BASE_DIR, 'system_prompt.txt'), 'r', encoding='utf-8') as f:
     SYSTEM_PROMPT = f.read()
 
-# === STATI VALIDI PER LE AREE ===
-AREA_STATES = {
-    'coperta',
-    'mancante',
-    'troppo_generica',
-    'ambigua',
-    'contraddittoria',
-    'insufficiente'
-}
+# === SESSIONE PER-UTENTE ===
+# La sessione è isolata per ogni utente tramite st.session_state.
+# In modalità CLI (python agent.py), usa un dizionario locale.
 
-# === STATO SESSIONE ===
-session = {
-    'gate': 0,
-    'conversation': [],
-    'areas_status': {},
-    'diagnosis': None,
-    'retrieval_done': False,
-    'retrieved_modules': None
-}
+_CLI_SESSION = None  # usato solo in modalità CLI
+
+def _default_session() -> dict:
+    return {
+        'gate': 0,
+        'conversation': [],
+        'areas_status': {},
+        'diagnosis': None,
+        'retrieval_done': False,
+        'retrieved_modules': None
+    }
+
+def get_session() -> dict:
+    """
+    Restituisce la sessione corrente.
+    - In Streamlit: usa st.session_state (isolata per utente)
+    - In CLI: usa variabile locale globale
+    """
+    try:
+        import streamlit as st
+        if 'ah_session' not in st.session_state:
+            st.session_state['ah_session'] = _default_session()
+        return st.session_state['ah_session']
+    except Exception:
+        global _CLI_SESSION
+        if _CLI_SESSION is None:
+            _CLI_SESSION = _default_session()
+        return _CLI_SESSION
+
+def reset_session():
+    """Resetta la sessione corrente."""
+    try:
+        import streamlit as st
+        st.session_state['ah_session'] = _default_session()
+    except Exception:
+        global _CLI_SESSION
+        _CLI_SESSION = _default_session()
+
+# Alias per retrocompatibilità con app.py che importa `session`
+# In Streamlit, `session` punta sempre alla sessione dell'utente corrente
+# tramite get_session(). Non è più un dict globale condiviso.
+class _SessionProxy:
+    """
+    Proxy trasparente che delega tutte le operazioni a get_session().
+    Permette di usare `session['key']` senza modificare app.py.
+    """
+    def __getitem__(self, key):
+        return get_session()[key]
+
+    def __setitem__(self, key, value):
+        get_session()[key] = value
+
+    def __contains__(self, key):
+        return key in get_session()
+
+    def get(self, key, default=None):
+        return get_session().get(key, default)
+
+    def __repr__(self):
+        return repr(get_session())
+
+session = _SessionProxy()
 
 # === POST-PROCESSING ===
 
@@ -67,18 +114,13 @@ def strip_process_blocks(text: str) -> str:
 # === GATE SEMANTICO ===
 
 def assess_area_coverage() -> dict:
-    """
-    Chiama Claude con la conversazione corrente e chiede di classificare
-    lo stato semantico reale delle 5 aree obbligatorie.
-    Restituisce un dict con lo stato di ciascuna area.
-    Usato per decidere se il gate può avanzare da 1 a 2.
-    """
-    if not session['conversation']:
+    s = get_session()
+    if not s['conversation']:
         return {}
 
     conversation_text = "\n".join([
         f"{'Utente' if m['role'] == 'user' else 'Coach'}: {m['content']}"
-        for m in session['conversation']
+        for m in s['conversation']
     ])
 
     assessment_prompt = f"""Analizza questa conversazione di coaching e classifica lo stato di raccolta delle 5 aree obbligatorie.
@@ -121,37 +163,23 @@ Restituisci SOLO questo JSON (nessun testo aggiuntivo, nessun markdown):
         raw = response.content[0].text.strip()
         raw = re.sub(r'```json|```', '', raw).strip()
         result = json.loads(raw)
-        # Salva lo stato delle aree in sessione
-        session['areas_status'] = {
-            k: v for k, v in result.items() if k != 'gate_ready'
-        }
-        print(f"[assess_area_coverage] {session['areas_status']} | gate_ready: {result.get('gate_ready')}")
+        s['areas_status'] = {k: v for k, v in result.items() if k != 'gate_ready'}
+        print(f"[assess_area_coverage] {s['areas_status']} | gate_ready: {result.get('gate_ready')}")
         return result
     except Exception as e:
         print(f"[assess_area_coverage] Errore: {e}")
         return {}
 
-def all_areas_covered() -> bool:
-    """
-    Restituisce True se tutte le 5 aree sono classificate come 'coperta'.
-    """
-    required = {'stato_attuale', 'punto_rottura', 'contesto', 'significato', 'tentativi'}
-    status = session.get('areas_status', {})
-    return all(status.get(area) == 'coperta' for area in required)
-
 # === ESTRAZIONE DIAGNOSI PER RETRIEVAL ===
 
 def extract_diagnosis_queries() -> dict:
-    """
-    Chiama Claude con la conversazione corrente e chiede di estrarre
-    in JSON le query per il retrieval semantico su Pinecone.
-    """
-    if not session['conversation']:
+    s = get_session()
+    if not s['conversation']:
         return None
 
     conversation_text = "\n".join([
         f"{'Utente' if m['role'] == 'user' else 'Coach'}: {m['content']}"
-        for m in session['conversation']
+        for m in s['conversation']
     ])
 
     extraction_prompt = f"""Analizza questa conversazione di coaching sul behavior change.
@@ -259,41 +287,38 @@ def format_retrieved_modules(matches):
         lines.append(f"  Contenuto: {meta.get('text_preview', '')[:400]}")
     return '\n'.join(lines)
 
-# === LOGICA DI GATE SEMANTICO ===
+# === LOGICA DI GATE ===
 
 def check_gate_advancement(user_message):
-    """
-    Gate 0 → 1: dopo il primo messaggio dell'utente (nuovo caso ricevuto)
-    Gate 1 → 2: solo quando assess_area_coverage() conferma tutte le aree coperte
-    Gate 2 → 3: gestito in chat() dopo la risposta del Coach
-    """
-    if session['gate'] == 0:
-        session['gate'] = 1
+    s = get_session()
+
+    if s['gate'] == 0:
+        s['gate'] = 1
         return
 
-    if session['gate'] == 1:
-        # Valutazione semantica reale delle aree
-        # Eseguita solo dopo almeno 2 turni utente per efficienza
-        user_turns = [m for m in session['conversation'] if m['role'] == 'user']
+    if s['gate'] == 1:
+        user_turns = [m for m in s['conversation'] if m['role'] == 'user']
         if len(user_turns) >= 2:
             assessment = assess_area_coverage()
             if assessment.get('gate_ready'):
-                session['gate'] = 2
+                s['gate'] = 2
                 print("[gate] 1 → 2: tutte le aree coperte semanticamente")
 
 # === ESECUZIONE RETRIEVAL ===
 
 def run_retrieval_if_needed():
-    if session['retrieval_done']:
+    s = get_session()
+
+    if s['retrieval_done']:
         return
-    if session['gate'] < 3:
+    if s['gate'] < 3:
         return
 
     diagnosis = extract_diagnosis_queries()
     if not diagnosis:
         return
 
-    session['diagnosis'] = diagnosis
+    s['diagnosis'] = diagnosis
 
     dominant_query = diagnosis.get('dominant', '')
     rival_query = diagnosis.get('rival', dominant_query)
@@ -318,8 +343,8 @@ def run_retrieval_if_needed():
                 except Exception:
                     pass
 
-    session['retrieval_done'] = True
-    session['retrieved_modules'] = {
+    s['retrieval_done'] = True
+    s['retrieved_modules'] = {
         'dominant': dominant_modules,
         'rival': rival_modules,
         'bdm_recommended': bdm_recommended
@@ -328,38 +353,37 @@ def run_retrieval_if_needed():
 # === COSTRUZIONE PROMPT PER TURNO ===
 
 def build_messages(user_input):
-    gate_context = f"\n\n=== STATO CORRENTE SESSIONE ===\nGate attivo: {session['gate']}\n"
+    s = get_session()
 
-    # Includi stato aree se disponibile
-    if session.get('areas_status'):
+    gate_context = f"\n\n=== STATO CORRENTE SESSIONE ===\nGate attivo: {s['gate']}\n"
+
+    if s.get('areas_status'):
         gate_context += "\nStato aree di raccolta:\n"
-        for area, stato in session['areas_status'].items():
+        for area, stato in s['areas_status'].items():
             gate_context += f"  {area}: {stato}\n"
 
-    if session['gate'] == 2:
+    if s['gate'] == 2:
         gate_context += "\nHai accesso al BDM pre-gate. Puoi usarlo per shortlist diagnostica ma NON per prescrivere tecniche.\n"
         gate_context += format_bdm_for_prompt(2)
 
-    if session['gate'] >= 3:
+    if s['gate'] >= 3:
         gate_context += "\nMicro-gate superato. Hai accesso a BDM completo e Knowledge base.\n"
         gate_context += format_bdm_for_prompt(3)
 
         run_retrieval_if_needed()
 
-        if session.get('retrieved_modules'):
-            rm = session['retrieved_modules']
-
+        if s.get('retrieved_modules'):
+            rm = s['retrieved_modules']
             if rm.get('bdm_recommended'):
                 gate_context += "\n=== MODULI RACCOMANDATI DAL BDM PER IL PATTERN DOMINANTE ===\n"
                 gate_context += format_retrieved_modules(rm['bdm_recommended'])
-
             gate_context += "\n" + format_retrieved_modules(rm['dominant'])
             gate_context += "\n=== MODULI PER TESTARE IPOTESI RIVALE ===\n"
             gate_context += format_retrieved_modules(rm['rival'])
 
     full_system = SYSTEM_PROMPT + gate_context
 
-    messages = session['conversation'].copy()
+    messages = s['conversation'].copy()
     messages.append({'role': 'user', 'content': user_input})
 
     return full_system, messages
@@ -367,6 +391,8 @@ def build_messages(user_input):
 # === LOOP PRINCIPALE ===
 
 def chat(user_input):
+    s = get_session()
+
     check_gate_advancement(user_input)
 
     system, messages = build_messages(user_input)
@@ -381,18 +407,17 @@ def chat(user_input):
     assistant_reply = response.content[0].text
     assistant_reply = strip_process_blocks(assistant_reply)
 
-    session['conversation'].append({'role': 'user', 'content': user_input})
-    session['conversation'].append({'role': 'assistant', 'content': assistant_reply})
+    s['conversation'].append({'role': 'user', 'content': user_input})
+    s['conversation'].append({'role': 'assistant', 'content': assistant_reply})
 
-    # Gate 2 → 3: avanza dopo sufficiente scambio diagnostico
-    if session['gate'] == 2:
-        if len(session['conversation']) >= 8:
-            session['gate'] = 3
+    if s['gate'] == 2:
+        if len(s['conversation']) >= 8:
+            s['gate'] = 3
             print("[gate] 2 → 3: conversazione diagnostica sufficiente")
 
     return assistant_reply
 
-# === INTERFACCIA CHAT (solo uso locale diretto) ===
+# === INTERFACCIA CLI ===
 
 if __name__ == '__main__':
     print("=" * 60)
@@ -410,17 +435,13 @@ if __name__ == '__main__':
                 print("Sessione terminata.")
                 break
             if user_input.lower() == 'reset':
-                session['conversation'] = []
-                session['gate'] = 0
-                session['retrieval_done'] = False
-                session['retrieved_modules'] = None
-                session['diagnosis'] = None
-                session['areas_status'] = {}
+                reset_session()
                 print("\n[Sessione resettata — nuovo caso]\n")
                 continue
             reply = chat(user_input)
+            s = get_session()
             print(f"\nCoach: {reply}")
-            print(f"\n[Gate: {session['gate']} | Aree: {session.get('areas_status',{})} | Retrieval: {session['retrieval_done']}]\n")
+            print(f"\n[Gate: {s['gate']} | Retrieval: {s['retrieval_done']}]\n")
         except KeyboardInterrupt:
             print("\nInterrotto.")
             break

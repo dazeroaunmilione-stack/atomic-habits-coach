@@ -1,5 +1,5 @@
 import streamlit as st
-from agent import chat, session
+from agent import chat, reset_session
 import re
 from datetime import datetime
 
@@ -333,18 +333,13 @@ def render_message(content, role):
     else:
         return f'<div class="msg-row"><div class="avatar avatar-coach">{COACH_AVATAR_SVG}</div><div class="bubble bubble-coach">{content_html}</div></div>'
 
-# ─── GENERAZIONE TESTO CHAT (per download) ──────────────────────────────────
+# ─── GENERAZIONE DOWNLOAD ────────────────────────────────────────────────────
 
 def generate_chat_text(messages: list) -> bytes:
-    """
-    Genera testo semplice della conversazione.
-    Usato come fallback leggero e veloce — sempre disponibile senza librerie esterne.
-    """
     lines = [
-        f"ATOMIC HABITS COACH",
+        "ATOMIC HABITS COACH",
         f"Sessione del {datetime.now().strftime('%d/%m/%Y %H:%M')}",
-        "=" * 50,
-        ""
+        "=" * 50, ""
     ]
     for msg in messages:
         role = "TU" if msg['role'] == 'user' else "COACH"
@@ -353,13 +348,7 @@ def generate_chat_text(messages: list) -> bytes:
         lines.append("\n" + "─" * 40 + "\n")
     return "\n".join(lines).encode('utf-8')
 
-
 def generate_pdf_bytes(messages: list) -> tuple:
-    """
-    Genera PDF della conversazione.
-    Restituisce (bytes, mime_type).
-    Se reportlab non è disponibile, restituisce testo con mime corretto.
-    """
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -398,7 +387,6 @@ def generate_pdf_bytes(messages: list) -> tuple:
         ]
 
         for msg in messages:
-            # Escape XML per reportlab
             content = (msg['content']
                 .replace('&', '&amp;')
                 .replace('<', '&lt;')
@@ -416,10 +404,8 @@ def generate_pdf_bytes(messages: list) -> tuple:
         return buffer.getvalue(), "application/pdf"
 
     except ImportError:
-        # reportlab non installato — fallback a testo
         return generate_chat_text(messages), "text/plain"
     except Exception:
-        # Qualsiasi altro errore — fallback sicuro a testo
         return generate_chat_text(messages), "text/plain"
 
 # ─── TOP BAR ────────────────────────────────────────────────────────────────
@@ -428,8 +414,6 @@ col1, col2, col3 = st.columns([6, 2, 2])
 with col2:
     messages = st.session_state.get('messages', [])
     if messages:
-        # Genera solo testo (veloce, nessuna dipendenza esterna)
-        # Il PDF viene generato al click grazie a st.download_button
         chat_bytes, mime = generate_pdf_bytes(messages)
         ext = "pdf" if mime == "application/pdf" else "txt"
         st.download_button(
@@ -442,12 +426,7 @@ with col2:
 
 with col3:
     if st.button("↺ Nuovo caso"):
-        session['conversation'] = []
-        session['gate'] = 0
-        session['retrieval_done'] = False
-        session['areas_status'] = {}
-        session['retrieved_modules'] = None
-        session['diagnosis'] = None
+        reset_session()  # resetta la sessione per-utente
         st.session_state.messages = []
         st.rerun()
 
@@ -480,7 +459,6 @@ if prompt := st.chat_input("Descrivi il tuo caso..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.markdown(render_message(prompt, "user"), unsafe_allow_html=True)
 
-    # Loading indicator animato
     loading_placeholder = st.empty()
     loading_placeholder.markdown(LOADING_INDICATOR, unsafe_allow_html=True)
 
