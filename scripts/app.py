@@ -1,5 +1,6 @@
 import streamlit as st
 from agent import chat, session
+import re
 
 st.set_page_config(
     page_title="Atomic Habits Coach",
@@ -30,7 +31,7 @@ html, body, [data-testid="stAppViewContainer"] {
 /* ─── MAIN CONTAINER ───────────────────────────────────────── */
 .main .block-container {
     max-width: 700px !important;
-    padding: 0 2rem 7rem 2rem !important;
+    padding: 0 2rem 9rem 2rem !important; /* aumentato per mobile */
     margin: 0 auto !important;
 }
 
@@ -113,7 +114,6 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 .msg-row.user { flex-direction: row-reverse; }
 
-/* Avatar */
 .avatar {
     width: 30px;
     height: 30px;
@@ -139,7 +139,6 @@ html, body, [data-testid="stAppViewContainer"] {
     font-size: 0.65rem;
 }
 
-/* Bubble */
 .bubble {
     max-width: 78%;
     padding: 0.85rem 1.15rem;
@@ -230,6 +229,14 @@ html, body, [data-testid="stAppViewContainer"] {
     transform: scale(1.05) !important;
 }
 
+/* ─── MOBILE ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .coach-title { font-size: 2.6rem !important; }
+    .bubble { max-width: 88% !important; font-size: 0.85rem !important; }
+    .main .block-container { padding-bottom: 11rem !important; }
+    [data-testid="stChatInput"] { padding-bottom: 1.8rem !important; }
+}
+
 /* ─── SPINNER ──────────────────────────────────────────────── */
 .stSpinner > div {
     border-color: #C4A35A transparent transparent transparent !important;
@@ -278,46 +285,30 @@ if not st.session_state.messages:
         </div>
     """, unsafe_allow_html=True)
 
-# Rendering messaggi con HTML custom
-for message in st.session_state.messages:
-    role = message["role"]
-    content = message["content"]
-    # Converti newline in <br> e asterischi bold
-    import re
+def render_message(content, role):
     content_html = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     content_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content_html)
     content_html = content_html.replace("\n", "<br>")
-
     if role == "user":
-        st.markdown(f"""
+        return f"""
         <div class="msg-row user">
             <div class="avatar avatar-user">F</div>
             <div class="bubble bubble-user">{content_html}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>"""
     else:
-        st.markdown(f"""
+        return f"""
         <div class="msg-row">
             <div class="avatar avatar-coach">◈</div>
             <div class="bubble bubble-coach">{content_html}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        </div>"""
 
-# Input
+for message in st.session_state.messages:
+    st.markdown(render_message(message["content"], message["role"]), unsafe_allow_html=True)
+
 if prompt := st.chat_input("Descrivi il tuo caso..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Mostra subito il messaggio utente
-    import re
-    p_html = prompt.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-    st.markdown(f"""
-    <div class="msg-row user">
-        <div class="avatar avatar-user">F</div>
-        <div class="bubble bubble-user">{p_html}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown(render_message(prompt, "user"), unsafe_allow_html=True)
     with st.spinner(""):
         reply = chat(prompt)
-
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
