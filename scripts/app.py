@@ -234,7 +234,7 @@ html, body, [data-testid="stAppViewContainer"] {
     .coach-title { font-size: 2.6rem !important; }
     .bubble { max-width: 88% !important; font-size: 0.85rem !important; }
     .main .block-container { padding-bottom: 11rem !important; }
-    [data-testid="stChatInput"] { padding-bottom: 1.8rem !important; }
+    [data-testid="stChatInput"] { padding-bottom: 3.5rem !important; }
 }
 
 /* ─── SPINNER ──────────────────────────────────────────────── */
