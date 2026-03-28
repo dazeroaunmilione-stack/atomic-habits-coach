@@ -373,7 +373,7 @@ def chat(user_input):
 
     response = claude.messages.create(
         model="claude-sonnet-4-5",
-        max_tokens=2048,
+        max_tokens=4096,
         system=system,
         messages=messages
     )
