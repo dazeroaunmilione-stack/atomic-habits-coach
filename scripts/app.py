@@ -325,27 +325,89 @@ LOADING_INDICATOR = f"""<div class="loading-row">
 # ─── RENDER MESSAGGIO ────────────────────────────────────────────────────────
 
 def render_message(content, role):
-    content_html = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    content_html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', content_html)
-    content_html = content_html.replace("\n", "<br>")
+    # Escape HTML
+    html = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    # Bold **testo**
+    html = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', html)
+
+    # Separatori ---
+    html = re.sub(
+        r'\n---+\n',
+        '\n<hr style="border:none;border-top:1px solid #E8E4DC;margin:10px 0;">\n',
+        html
+    )
+
+    # Processa riga per riga — compatibile Python 3.9
+    lines = html.split('\n')
+    result = []
+
+    for line in lines:
+        line = line.rstrip()
+
+        # Lista numerata: "1. testo"
+        m = re.match(r'^(\d+\.)\s+(.*)', line)
+        if m:
+            num = m.group(1)
+            text = m.group(2)
+            result.append(
+                '<div style="display:flex;gap:8px;margin:4px 0;">'
+                '<span style="color:#C4A35A;font-weight:600;flex-shrink:0;">' + num + '</span>'
+                '<span>' + text + '</span>'
+                '</div>'
+            )
+            continue
+
+        # Lista puntata: "- testo" o "* testo"
+        m2 = re.match(r'^[-*]\s+(.*)', line)
+        if m2:
+            text = m2.group(1)
+            result.append(
+                '<div style="display:flex;gap:8px;margin:4px 0;">'
+                '<span style="color:#C4A35A;flex-shrink:0;">·</span>'
+                '<span>' + text + '</span>'
+                '</div>'
+            )
+            continue
+
+        # Riga vuota
+        if line.strip() == '':
+            result.append('<div style="height:8px;"></div>')
+            continue
+
+        # Testo normale
+        result.append('<span>' + line + '</span><br>')
+
+    content_html = ''.join(result)
+
     if role == "user":
-        return f'<div class="msg-row user"><div class="avatar avatar-user">{USER_AVATAR_SVG}</div><div class="bubble bubble-user">{content_html}</div></div>'
+        return (
+            '<div class="msg-row user">'
+            '<div class="avatar avatar-user">' + USER_AVATAR_SVG + '</div>'
+            '<div class="bubble bubble-user">' + content_html + '</div>'
+            '</div>'
+        )
     else:
-        return f'<div class="msg-row"><div class="avatar avatar-coach">{COACH_AVATAR_SVG}</div><div class="bubble bubble-coach">{content_html}</div></div>'
+        return (
+            '<div class="msg-row">'
+            '<div class="avatar avatar-coach">' + COACH_AVATAR_SVG + '</div>'
+            '<div class="bubble bubble-coach">' + content_html + '</div>'
+            '</div>'
+        )
 
 # ─── GENERAZIONE DOWNLOAD ────────────────────────────────────────────────────
 
 def generate_chat_text(messages: list) -> bytes:
     lines = [
         "ATOMIC HABITS COACH",
-        f"Sessione del {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        "Sessione del " + datetime.now().strftime('%d/%m/%Y %H:%M'),
         "=" * 50, ""
     ]
     for msg in messages:
         role = "TU" if msg['role'] == 'user' else "COACH"
-        lines.append(f"{role}:")
+        lines.append(role + ":")
         lines.append(msg['content'])
-        lines.append("\n" + "─" * 40 + "\n")
+        lines.append("\n" + "-" * 40 + "\n")
     return "\n".join(lines).encode('utf-8')
 
 def generate_pdf_bytes(messages: list) -> tuple:
@@ -383,7 +445,7 @@ def generate_pdf_bytes(messages: list) -> tuple:
 
         story = [
             Paragraph("Atomic Habits Coach", title_s),
-            Paragraph(f"Sessione del {datetime.now().strftime('%d %B %Y, %H:%M')}", sub_s),
+            Paragraph("Sessione del " + datetime.now().strftime('%d %B %Y, %H:%M'), sub_s),
         ]
 
         for msg in messages:
@@ -419,14 +481,14 @@ with col2:
         st.download_button(
             label="↓ Scarica",
             data=chat_bytes,
-            file_name=f"atomic_habits_coach_{datetime.now().strftime('%Y%m%d_%H%M')}.{ext}",
+            file_name="atomic_habits_coach_" + datetime.now().strftime('%Y%m%d_%H%M') + "." + ext,
             mime=mime,
             key="download_chat"
         )
 
 with col3:
     if st.button("↺ Nuovo caso"):
-        reset_session()  # resetta la sessione per-utente
+        reset_session()
         st.session_state.messages = []
         st.rerun()
 
