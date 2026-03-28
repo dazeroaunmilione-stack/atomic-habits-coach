@@ -42,7 +42,8 @@ session = {
     'conversation': [],
     'areas_status': {},
     'diagnosis': None,
-    'retrieval_done': False
+    'retrieval_done': False,
+    'retrieved_modules': None
 }
 
 # === POST-PROCESSING ===
@@ -52,6 +53,61 @@ def strip_process_blocks(text: str) -> str:
     cleaned = re.sub(r'<process[^>]*>.*', '', cleaned, flags=re.DOTALL)
     cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
     return cleaned.strip()
+
+# === ESTRAZIONE DIAGNOSI PER RETRIEVAL ===
+
+def extract_diagnosis_queries() -> dict:
+    """
+    Chiama Claude con la conversazione corrente e chiede di estrarre
+    in JSON le query per il retrieval semantico su Pinecone:
+    - dominant: descrizione della causa dominante identificata
+    - rival: descrizione della causa rivale considerata
+    - dominant_bdm: ID pattern BDM dominante (es. BD09)
+    - rival_bdm: ID pattern BDM rivale (es. BD13)
+    Restituisce un dict con queste 4 chiavi.
+    """
+    if not session['conversation']:
+        return None
+
+    conversation_text = "\n".join([
+        f"{'Utente' if m['role'] == 'user' else 'Coach'}: {m['content']}"
+        for m in session['conversation']
+    ])
+
+    extraction_prompt = f"""Analizza questa conversazione di coaching sul behavior change.
+
+CONVERSAZIONE:
+{conversation_text}
+
+Basandoti su ciò che il Coach ha identificato nella conversazione, estrai le seguenti informazioni in formato JSON puro (nessun testo aggiuntivo, nessun markdown):
+
+{{
+  "dominant": "descrizione in italiano della causa dominante del blocco comportamentale (2-3 frasi che catturano il meccanismo specifico)",
+  "rival": "descrizione in italiano della causa rivale considerata e perché è stata esclusa o trattata come secondaria (2-3 frasi)",
+  "dominant_bdm": "ID del pattern BDM dominante se identificabile (es. BD09), altrimenti null",
+  "rival_bdm": "ID del pattern BDM rivale se identificabile (es. BD13), altrimenti null"
+}}
+
+Se la diagnosi non è ancora stata completata nella conversazione, restituisci:
+{{"dominant": null, "rival": null, "dominant_bdm": null, "rival_bdm": null}}"""
+
+    try:
+        response = claude.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=512,
+            messages=[{"role": "user", "content": extraction_prompt}]
+        )
+        raw = response.content[0].text.strip()
+        # Rimuove eventuali backtick markdown
+        raw = re.sub(r'```json|```', '', raw).strip()
+        result = json.loads(raw)
+        # Valida che abbia le chiavi attese
+        if result.get('dominant'):
+            return result
+        return None
+    except Exception as e:
+        print(f"[extract_diagnosis_queries] Errore: {e}")
+        return None
 
 # === FUNZIONI RETRIEVAL ===
 
@@ -76,6 +132,18 @@ def retrieve_modules_paired(dominant_query, rival_query, top_k=3):
     dominant = retrieve_modules(dominant_query, top_k)
     rival = retrieve_modules(rival_query, top_k)
     return dominant, rival
+
+def get_recommended_modules_from_bdm(bdm_id: str) -> list:
+    """
+    Dato un BDM ID (es. 'BD09'), restituisce la lista di module_id
+    raccomandati dal BDM post-gate per quel pattern.
+    """
+    for pattern in BDM_POST:
+        if pattern.get('diagnosis_id') == bdm_id:
+            raw = pattern.get('recommended_modules', '')
+            if raw:
+                return [m.strip() for m in str(raw).split('|') if m.strip()]
+    return []
 
 def format_bdm_for_prompt(gate_level):
     if gate_level < 2:
@@ -123,6 +191,60 @@ def check_gate_advancement(user_message):
         if len(user_turns) >= 2:
             session['gate'] = 2
 
+# === ESECUZIONE RETRIEVAL ===
+
+def run_retrieval_if_needed():
+    """
+    Eseguito quando gate >= 3 e retrieval non ancora fatto.
+    1. Estrae diagnosi dalla conversazione via Claude
+    2. Se ha BDM ID, usa i moduli raccomandati dal BDM per filtrare
+    3. In parallelo fa retrieval semantico su dominant + rival query
+    4. Salva i risultati in session['retrieved_modules']
+    """
+    if session['retrieval_done']:
+        return
+    if session['gate'] < 3:
+        return
+
+    diagnosis = extract_diagnosis_queries()
+    if not diagnosis:
+        return
+
+    session['diagnosis'] = diagnosis
+
+    dominant_query = diagnosis.get('dominant', '')
+    rival_query = diagnosis.get('rival', dominant_query)
+
+    # Retrieval semantico su query estratte
+    dominant_modules, rival_modules = retrieve_modules_paired(
+        dominant_query, rival_query, top_k=4
+    )
+
+    # Se BDM ID disponibili, recupera anche i moduli raccomandati dal BDM
+    bdm_recommended = []
+    dominant_bdm = diagnosis.get('dominant_bdm')
+    if dominant_bdm:
+        recommended_ids = get_recommended_modules_from_bdm(dominant_bdm)
+        if recommended_ids:
+            # Filtra Pinecone per module_id raccomandati
+            for mod_id in recommended_ids[:3]:
+                try:
+                    filtered = retrieve_modules(
+                        dominant_query,
+                        top_k=1,
+                        filter_metadata={"module_id": mod_id}
+                    )
+                    bdm_recommended.extend(filtered)
+                except Exception:
+                    pass
+
+    session['retrieval_done'] = True
+    session['retrieved_modules'] = {
+        'dominant': dominant_modules,
+        'rival': rival_modules,
+        'bdm_recommended': bdm_recommended
+    }
+
 # === COSTRUZIONE PROMPT PER TURNO ===
 
 def build_messages(user_input):
@@ -136,20 +258,23 @@ def build_messages(user_input):
         gate_context += "\nMicro-gate superato. Hai accesso a BDM completo e Knowledge base.\n"
         gate_context += format_bdm_for_prompt(3)
 
-        if not session['retrieval_done'] and session.get('diagnosis'):
-            dominant_query = session['diagnosis'].get('dominant', user_input)
-            rival_query = session['diagnosis'].get('rival', user_input)
-            dominant_modules, rival_modules = retrieve_modules_paired(dominant_query, rival_query)
-            session['retrieval_done'] = True
-            session['retrieved_modules'] = {
-                'dominant': dominant_modules,
-                'rival': rival_modules
-            }
+        # Esegui retrieval se non già fatto
+        run_retrieval_if_needed()
 
         if session.get('retrieved_modules'):
-            gate_context += "\n" + format_retrieved_modules(session['retrieved_modules']['dominant'])
+            rm = session['retrieved_modules']
+
+            # Moduli BDM-guidati (più precisi)
+            if rm.get('bdm_recommended'):
+                gate_context += "\n=== MODULI RACCOMANDATI DAL BDM PER IL PATTERN DOMINANTE ===\n"
+                gate_context += format_retrieved_modules(rm['bdm_recommended'])
+
+            # Moduli semantici per ipotesi dominante
+            gate_context += "\n" + format_retrieved_modules(rm['dominant'])
+
+            # Moduli per testare l'ipotesi rivale
             gate_context += "\n=== MODULI PER TESTARE IPOTESI RIVALE ===\n"
-            gate_context += format_retrieved_modules(session['retrieved_modules']['rival'])
+            gate_context += format_retrieved_modules(rm['rival'])
 
     full_system = SYSTEM_PROMPT + gate_context
 
@@ -206,11 +331,12 @@ if __name__ == '__main__':
                 session['gate'] = 0
                 session['retrieval_done'] = False
                 session['retrieved_modules'] = None
+                session['diagnosis'] = None
                 print("\n[Sessione resettata — nuovo caso]\n")
                 continue
             reply = chat(user_input)
             print(f"\nCoach: {reply}")
-            print(f"\n[Gate corrente: {session['gate']}]\n")
+            print(f"\n[Gate: {session['gate']} | Retrieval: {session['retrieval_done']} | Diagnosis: {bool(session['diagnosis'])}]\n")
         except KeyboardInterrupt:
             print("\nInterrotto.")
             break
