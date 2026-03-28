@@ -45,17 +45,10 @@ html, body, [data-testid="stAppViewContainer"] {
     margin: 0 auto !important;
 }
 
-/* ─── NUOVO CASO — fixed top right ────────────────────────── */
-.nuovo-caso-fixed {
-    position: fixed;
-    top: 14px;
-    right: 18px;
-    z-index: 9999;
-}
-
-.nuovo-caso-fixed .stButton > button {
+/* ─── NUOVO CASO BUTTON ────────────────────────────────────── */
+.stButton > button {
     background: transparent !important;
-    border: 1px solid #E0DBD3 !important;
+    border: 1px solid #D8D3CA !important;
     border-radius: 50px !important;
     padding: 0.35rem 0.9rem !important;
     font-family: 'DM Sans', sans-serif !important;
@@ -63,13 +56,13 @@ html, body, [data-testid="stAppViewContainer"] {
     font-weight: 500 !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
-    color: #B0A898 !important;
+    color: #888 !important;
     cursor: pointer !important;
     transition: all 0.2s ease !important;
     white-space: nowrap !important;
 }
 
-.nuovo-caso-fixed .stButton > button:hover {
+.stButton > button:hover {
     border-color: #C4A35A !important;
     color: #C4A35A !important;
 }
@@ -99,8 +92,8 @@ html, body, [data-testid="stAppViewContainer"] {
 .coach-subtitle {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.75rem;
-    font-weight: 300;
-    color: #B0A898;
+    font-weight: 400;
+    color: #7A7570 !important; /* più scuro */
     letter-spacing: 0.18em;
     text-transform: uppercase;
 }
@@ -121,18 +114,24 @@ html, body, [data-testid="stAppViewContainer"] {
 .empty-state .icon {
     font-size: 1.6rem;
     margin-bottom: 0.8rem;
-    opacity: 0.25;
+    opacity: 0.3;
     color: #C4A35A;
 }
 
 .empty-state p {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.82rem;
-    font-weight: 300;
+    font-weight: 400;
     line-height: 1.8;
-    color: #C0B8AE;
+    color: #8A847C !important; /* più scuro */
     max-width: 300px;
     margin: 0 auto;
+}
+
+/* ─── HIDE DEFAULT AVATARS ─────────────────────────────────── */
+[data-testid="chatAvatarIcon-user"],
+[data-testid="chatAvatarIcon-assistant"] {
+    display: none !important;
 }
 
 /* ─── CHAT MESSAGES ────────────────────────────────────────── */
@@ -140,12 +139,47 @@ html, body, [data-testid="stAppViewContainer"] {
     background: transparent !important;
     border: none !important;
     padding: 0.3rem 0 !important;
-    margin-bottom: 0.4rem !important;
+    margin-bottom: 0.6rem !important;
+    gap: 0.6rem !important;
 }
 
+/* Avatar custom — utente */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"])::before {
+    content: "U";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #2C2C2C;
+    color: #C4A35A;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+/* Avatar custom — coach */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"])::before {
+    content: "◈";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #C4A35A, #E8C97A);
+    color: #fff;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+}
+
+/* Bubble utente */
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) .stMarkdown {
-    background: #1A1A1A !important;
-    color: #F8F7F5 !important;
+    background: #2C2C2C !important;
+    color: #F0EDE8 !important;
     border-radius: 20px 20px 4px 20px !important;
     padding: 0.85rem 1.15rem !important;
     max-width: 76% !important;
@@ -154,31 +188,27 @@ html, body, [data-testid="stAppViewContainer"] {
     margin-left: auto !important;
 }
 
+/* Bubble coach */
 [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) .stMarkdown {
     background: #FFFFFF !important;
-    color: #1A1A1A !important;
+    color: #2C2C2C !important;
     border-radius: 20px 20px 20px 4px !important;
     padding: 1rem 1.3rem !important;
     max-width: 84% !important;
     font-size: 0.88rem !important;
     line-height: 1.75 !important;
-    border: 1px solid #EDEAE4 !important;
+    border: 1px solid #E8E4DC !important;
     box-shadow: 0 2px 12px rgba(0,0,0,0.04) !important;
 }
 
-[data-testid="chatAvatarIcon-user"] {
-    background: #1A1A1A !important;
-    border-radius: 50% !important;
-    color: #C4A35A !important;
+/* testo dentro le bubble sempre visibile */
+[data-testid="stChatMessage"] .stMarkdown p,
+[data-testid="stChatMessage"] .stMarkdown li,
+[data-testid="stChatMessage"] .stMarkdown strong {
+    color: inherit !important;
 }
 
-[data-testid="chatAvatarIcon-assistant"] {
-    background: linear-gradient(135deg, #C4A35A, #E8C97A) !important;
-    border-radius: 50% !important;
-    color: #FFF !important;
-}
-
-/* ─── CHAT INPUT — centrato, bordo eliminato ───────────────── */
+/* ─── CHAT INPUT ───────────────────────────────────────────── */
 [data-testid="stChatInput"] {
     position: fixed !important;
     bottom: 0 !important;
@@ -192,13 +222,10 @@ html, body, [data-testid="stAppViewContainer"] {
     z-index: 998 !important;
     display: flex !important;
     justify-content: center !important;
-
-    /* elimina il bordo/box scuro di Streamlit */
     box-shadow: none !important;
     outline: none !important;
 }
 
-/* wrapper interno — controlla la larghezza */
 [data-testid="stChatInput"] > div {
     max-width: 520px !important;
     width: 100% !important;
@@ -210,7 +237,6 @@ html, body, [data-testid="stAppViewContainer"] {
     outline: none !important;
 }
 
-/* tutti i div interni: nessun bordo scuro */
 [data-testid="stChatInput"] div {
     background: transparent !important;
     border: none !important;
@@ -218,7 +244,6 @@ html, body, [data-testid="stAppViewContainer"] {
     outline: none !important;
 }
 
-/* la textarea vera */
 [data-testid="stChatInput"] textarea {
     background: #FFFFFF !important;
     border: 1px solid #E0DBD3 !important;
@@ -226,7 +251,7 @@ html, body, [data-testid="stAppViewContainer"] {
     padding: 0.75rem 1.3rem !important;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 0.86rem !important;
-    color: #1A1A1A !important;
+    color: #2C2C2C !important;
     transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
     box-shadow: 0 2px 14px rgba(0,0,0,0.05) !important;
     resize: none !important;
@@ -240,12 +265,11 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 [data-testid="stChatInput"] textarea::placeholder {
-    color: #C0B8AE !important;
+    color: #7A7570 !important; /* più scuro */
     font-style: italic !important;
     font-weight: 300 !important;
 }
 
-/* bottone invio */
 [data-testid="stChatInput"] button {
     background: #C4A35A !important;
     border: none !important;
@@ -257,7 +281,7 @@ html, body, [data-testid="stAppViewContainer"] {
 }
 
 [data-testid="stChatInput"] button:hover {
-    background: #1A1A1A !important;
+    background: #2C2C2C !important;
     transform: scale(1.05) !important;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
 }
@@ -276,18 +300,17 @@ html, body, [data-testid="stAppViewContainer"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── BOTTONE NUOVO CASO — fixed top right via HTML ──────────────────────────
-# Usiamo un container posizionato in alto a destra con CSS
-st.markdown('<div class="nuovo-caso-fixed" id="nuovo-caso-container">', unsafe_allow_html=True)
-if st.button("↺ Nuovo caso"):
-    session['conversation'] = []
-    session['gate'] = 0
-    session['retrieval_done'] = False
-    if 'retrieved_modules' in session:
-        session['retrieved_modules'] = None
-    st.session_state.messages = []
-    st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
+# ─── BOTTONE NUOVO CASO — top right ─────────────────────────────────────────
+col1, col2 = st.columns([8, 2])
+with col2:
+    if st.button("↺ Nuovo caso"):
+        session['conversation'] = []
+        session['gate'] = 0
+        session['retrieval_done'] = False
+        if 'retrieved_modules' in session:
+            session['retrieved_modules'] = None
+        st.session_state.messages = []
+        st.rerun()
 
 # ─── HEADER ─────────────────────────────────────────────────────────────────
 st.markdown("""
