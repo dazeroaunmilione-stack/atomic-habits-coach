@@ -41,18 +41,25 @@ html, body, [data-testid="stAppViewContainer"] {
 /* ─── MAIN CONTAINER ───────────────────────────────────────── */
 .main .block-container {
     max-width: 700px !important;
-    padding: 2rem 2rem 7rem 2rem !important;
+    padding: 0 2rem 7rem 2rem !important;
     margin: 0 auto !important;
 }
 
-/* ─── NUOVO CASO BUTTON ────────────────────────────────────── */
-.stButton > button {
+/* ─── NUOVO CASO — fixed top right ────────────────────────── */
+.nuovo-caso-fixed {
+    position: fixed;
+    top: 14px;
+    right: 18px;
+    z-index: 9999;
+}
+
+.nuovo-caso-fixed .stButton > button {
     background: transparent !important;
     border: 1px solid #E0DBD3 !important;
     border-radius: 50px !important;
-    padding: 0.4rem 1rem !important;
+    padding: 0.35rem 0.9rem !important;
     font-family: 'DM Sans', sans-serif !important;
-    font-size: 0.68rem !important;
+    font-size: 0.65rem !important;
     font-weight: 500 !important;
     letter-spacing: 0.1em !important;
     text-transform: uppercase !important;
@@ -62,7 +69,7 @@ html, body, [data-testid="stAppViewContainer"] {
     white-space: nowrap !important;
 }
 
-.stButton > button:hover {
+.nuovo-caso-fixed .stButton > button:hover {
     border-color: #C4A35A !important;
     color: #C4A35A !important;
 }
@@ -70,7 +77,7 @@ html, body, [data-testid="stAppViewContainer"] {
 /* ─── HEADER ───────────────────────────────────────────────── */
 .coach-header {
     text-align: center;
-    padding: 1.5rem 0 2.5rem 0;
+    padding: 3rem 0 2.5rem 0;
     margin-bottom: 0.5rem;
 }
 
@@ -171,28 +178,47 @@ html, body, [data-testid="stAppViewContainer"] {
     color: #FFF !important;
 }
 
-/* ─── CHAT INPUT ───────────────────────────────────────────── */
+/* ─── CHAT INPUT — centrato, bordo eliminato ───────────────── */
 [data-testid="stChatInput"] {
     position: fixed !important;
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    background: rgba(248, 247, 245, 0.94) !important;
+    background: rgba(248, 247, 245, 0.95) !important;
     backdrop-filter: blur(14px) !important;
     -webkit-backdrop-filter: blur(14px) !important;
     border-top: 1px solid #EAE7E1 !important;
     padding: 0.9rem 0 1.1rem 0 !important;
-    z-index: 999 !important;
+    z-index: 998 !important;
     display: flex !important;
     justify-content: center !important;
+
+    /* elimina il bordo/box scuro di Streamlit */
+    box-shadow: none !important;
+    outline: none !important;
 }
 
+/* wrapper interno — controlla la larghezza */
 [data-testid="stChatInput"] > div {
-    max-width: 560px !important;
+    max-width: 520px !important;
     width: 100% !important;
-    padding: 0 2rem !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
+/* tutti i div interni: nessun bordo scuro */
+[data-testid="stChatInput"] div {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* la textarea vera */
 [data-testid="stChatInput"] textarea {
     background: #FFFFFF !important;
     border: 1px solid #E0DBD3 !important;
@@ -204,6 +230,7 @@ html, body, [data-testid="stAppViewContainer"] {
     transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
     box-shadow: 0 2px 14px rgba(0,0,0,0.05) !important;
     resize: none !important;
+    outline: none !important;
 }
 
 [data-testid="stChatInput"] textarea:focus {
@@ -218,6 +245,7 @@ html, body, [data-testid="stAppViewContainer"] {
     font-weight: 300 !important;
 }
 
+/* bottone invio */
 [data-testid="stChatInput"] button {
     background: #C4A35A !important;
     border: none !important;
@@ -225,6 +253,7 @@ html, body, [data-testid="stAppViewContainer"] {
     color: white !important;
     transition: all 0.2s ease !important;
     box-shadow: 0 2px 8px rgba(196,163,90,0.3) !important;
+    outline: none !important;
 }
 
 [data-testid="stChatInput"] button:hover {
@@ -247,17 +276,18 @@ html, body, [data-testid="stAppViewContainer"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ─── TOP BAR con bottone Nuovo caso ─────────────────────────────────────────
-col1, col2 = st.columns([8, 2])
-with col2:
-    if st.button("↺ Nuovo caso"):
-        session['conversation'] = []
-        session['gate'] = 0
-        session['retrieval_done'] = False
-        if 'retrieved_modules' in session:
-            session['retrieved_modules'] = None
-        st.session_state.messages = []
-        st.rerun()
+# ─── BOTTONE NUOVO CASO — fixed top right via HTML ──────────────────────────
+# Usiamo un container posizionato in alto a destra con CSS
+st.markdown('<div class="nuovo-caso-fixed" id="nuovo-caso-container">', unsafe_allow_html=True)
+if st.button("↺ Nuovo caso"):
+    session['conversation'] = []
+    session['gate'] = 0
+    session['retrieval_done'] = False
+    if 'retrieved_modules' in session:
+        session['retrieved_modules'] = None
+    st.session_state.messages = []
+    st.rerun()
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ─── HEADER ─────────────────────────────────────────────────────────────────
 st.markdown("""
