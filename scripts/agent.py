@@ -54,10 +54,12 @@ def _default_session():
         'gate': 0,
         'conversation': [],
         'areas_status': {},
+        'bdm_mapping': None,
         'diagnosis': None,
         'micro_gate_result': None,
         'retrieval_done': False,
         'retrieved_modules': None,
+        'validation_history': [],
     }
 
 def get_session():
@@ -166,6 +168,85 @@ Restituisci SOLO JSON:
         log("assess", f"Aree: {s['areas_status']} | gate_ready: {result.get('gate_ready')}")
         return result
     return {}
+
+# =========================================================================
+# GATE 1→2: BDM MAPPING OBBLIGATORIO
+# =========================================================================
+
+def map_bdm_patterns():
+    """Mappa OBBLIGATORIAMENTE il caso su 2-3 pattern BDM con scoring.
+    Questo non è opzionale: l'agente DEVE identificare i pattern più
+    probabili e giustificare perché il primo batte il secondo."""
+    s = get_session()
+
+    conversation_text = "\n".join([
+        f"{'Utente' if m['role'] == 'user' else 'Coach'}: {m['content']}"
+        for m in s['conversation']
+    ])
+
+    bdm_summary = json.dumps([{
+        'id': p['diagnosis_id'],
+        'pattern': p['problem_pattern'],
+        'sintomo': p['symptom_description'],
+        'esclude': p.get('disconfirming_signals', ''),
+        'rivale_vicina': p.get('nearest_rival_pattern', ''),
+        'rivale_cross': p.get('cross_family_rival_pattern', ''),
+    } for p in BDM_PRE], ensure_ascii=False)
+
+    result = claude_json_call(f"""Sei un diagnostico esperto di behavior change. Analizza questa conversazione e mappa il caso sui pattern BDM più probabili.
+
+CONVERSAZIONE:
+{conversation_text}
+
+CATALOGO BDM (30 pattern):
+{bdm_summary}
+
+ISTRUZIONI:
+1. Identifica i 3 pattern BDM più probabili per questo caso
+2. Per ciascuno assegna un punteggio di probabilità (0-100)
+3. Per il pattern dominante, spiega PERCHÉ batte il secondo
+4. Per il secondo, spiega cosa lo renderebbe dominante (quale evidenza manca)
+5. Per il terzo (cross-family), spiega perché è meno probabile ma non escludibile
+
+Restituisci SOLO JSON:
+{{
+  "patterns": [
+    {{
+      "bdm_id": "BD__",
+      "pattern_name": "nome del pattern",
+      "probability": 0-100,
+      "evidence": "evidenze dalla conversazione che supportano questo pattern",
+      "against": "evidenze che lo indeboliscono"
+    }},
+    {{
+      "bdm_id": "BD__",
+      "pattern_name": "nome del pattern",
+      "probability": 0-100,
+      "evidence": "evidenze",
+      "against": "evidenze contrarie"
+    }},
+    {{
+      "bdm_id": "BD__",
+      "pattern_name": "nome del pattern",
+      "probability": 0-100,
+      "evidence": "evidenze",
+      "against": "evidenze contrarie"
+    }}
+  ],
+  "dominant_beats_rival": "perché il primo pattern batte il secondo su questo caso specifico",
+  "rival_would_win_if": "cosa dovrebbe emergere per ribaltare la classifica",
+  "cross_family_excluded_because": "perché il terzo pattern è meno probabile"
+}}""", max_tokens=1200)
+
+    if result and result.get('patterns'):
+        s['bdm_mapping'] = result
+        patterns = result['patterns']
+        log("bdm_mapping", f"Top 3: {[p['bdm_id'] + ' (' + str(p['probability']) + '%)' for p in patterns]}")
+        log("bdm_mapping", f"Dominante batte rivale: {result.get('dominant_beats_rival', '-')[:100]}")
+        return result
+
+    log("bdm_mapping", "FALLITO — nessun pattern identificato")
+    return None
 
 # =========================================================================
 # GATE 2→3: MICRO-GATE REALE (non conteggio turni)
@@ -381,8 +462,13 @@ def check_gate_advancement(user_message):
     if s['gate'] == 1 and len(user_turns) >= 2:
         assessment = assess_area_coverage()
         if assessment.get('gate_ready'):
-            s['gate'] = 2
-            log("gate", "1 → 2: tutte le aree coperte")
+            # BDM MAPPING OBBLIGATORIO: mappa il caso su 2-3 pattern prima di avanzare
+            bdm_result = map_bdm_patterns()
+            if bdm_result:
+                s['gate'] = 2
+                log("gate", "1 → 2: aree coperte + BDM mapping completato")
+            else:
+                log("gate", "1: aree coperte ma BDM mapping fallito — resta in gate 1")
         else:
             log("gate", f"1: aree incomplete — {s.get('areas_status', {})}")
 
@@ -423,6 +509,22 @@ def build_messages(user_input):
         gate_context += "\nHai accesso al BDM pre-gate. Puoi usarlo per shortlist diagnostica ma NON per prescrivere tecniche.\n"
         gate_context += format_bdm_for_prompt(2)
 
+        # BDM MAPPING OBBLIGATORIO — iniettato come struttura vincolante
+        bdm_map = s.get('bdm_mapping')
+        if bdm_map and bdm_map.get('patterns'):
+            gate_context += "\n\n=== MAPPING BDM OBBLIGATORIO (struttura vincolante) ===\n"
+            gate_context += "Il caso è stato mappato sui seguenti pattern. La tua diagnosi DEVE partire da qui.\n"
+            gate_context += "NON puoi ignorare questo mapping. NON puoi proporre una diagnosi che non sia ancorata a questi pattern.\n\n"
+            for i, p in enumerate(bdm_map['patterns']):
+                rank = ['DOMINANTE', 'RIVALE VICINA', 'RIVALE CROSS-FAMILY'][i] if i < 3 else f'PATTERN {i+1}'
+                gate_context += f"  {rank}: {p['bdm_id']} — {p['pattern_name']} (probabilità: {p['probability']}%)\n"
+                gate_context += f"    Evidenze a favore: {p['evidence']}\n"
+                gate_context += f"    Evidenze contro: {p['against']}\n\n"
+            gate_context += f"  Perché il dominante batte il rivale: {bdm_map.get('dominant_beats_rival', '-')}\n"
+            gate_context += f"  Il rivale vincerebbe se: {bdm_map.get('rival_would_win_if', '-')}\n"
+            gate_context += f"  Cross-family escluso perché: {bdm_map.get('cross_family_excluded_because', '-')}\n"
+            gate_context += "\nLa tua diagnosi differenziale deve CONFERMARE o RIBALTARE questa classifica con evidenze dalla conversazione.\n"
+
         # Se micro-gate tentato ma fallito, mostra il motivo
         mgr = s.get('micro_gate_result')
         if mgr and not mgr.get('gate_passed'):
@@ -449,6 +551,100 @@ def build_messages(user_input):
     messages.append({'role': 'user', 'content': user_input})
 
     return full_system, messages
+
+# =========================================================================
+# VALIDATORE POST-RISPOSTA (5 criteri di qualità)
+# =========================================================================
+
+def validate_response(user_input, assistant_reply):
+    """Seconda chiamata Claude che valida la risposta contro 5 criteri.
+    Se fallisce 2+ criteri, la risposta viene rigenerata.
+    Restituisce (is_valid, feedback, scores)."""
+    s = get_session()
+
+    # Valida solo risposte in gate 3 (quando c'è prescrizione)
+    if s['gate'] < 3:
+        return True, None, None
+
+    bdm_map = s.get('bdm_mapping', {})
+    bdm_context = ""
+    if bdm_map and bdm_map.get('patterns'):
+        bdm_context = f"Pattern dominante: {bdm_map['patterns'][0]['bdm_id']} — {bdm_map['patterns'][0]['pattern_name']}"
+
+    diagnosis = s.get('diagnosis', {})
+    diag_context = ""
+    if diagnosis:
+        diag_context = f"Diagnosi: {diagnosis.get('dominant', 'N/A')} | Rivale: {diagnosis.get('rival', 'N/A')}"
+
+    result = claude_json_call(f"""Sei un quality checker per un AI Coach di behavior change. Valuta questa risposta contro 5 criteri.
+
+DOMANDA DELL'UTENTE:
+{user_input}
+
+RISPOSTA DEL COACH:
+{assistant_reply}
+
+CONTESTO DIAGNOSTICO:
+{bdm_context}
+{diag_context}
+
+VALUTA CIASCUN CRITERIO (1-10):
+
+1. SPECIFICITÀ: La tecnica è specifica per QUESTO caso? O è un consiglio generico che andrebbe bene per chiunque?
+   (1 = consiglio generico da libro, 10 = intervento cucito sul caso)
+
+2. INTERCAMBIABILITÀ: Se cambiassi il caso ma tenessi la stessa risposta, funzionerebbe ugualmente?
+   (1 = identica per qualsiasi caso, 10 = impossibile da riciclare)
+
+3. PUNTO DI ROTTURA: Il punto specifico dove il comportamento si rompe è affrontato direttamente?
+   (1 = ignorato, 10 = è il centro dell'intervento)
+
+4. PROTEZIONE FALLIMENTO: C'è una strategia concreta per quando l'intervento potrebbe fallire?
+   (1 = nessuna, 10 = recovery chiaro e realistico)
+
+5. VERIFICABILITÀ: L'utente può capire entro 7 giorni se sta funzionando?
+   (1 = nessun criterio, 10 = indicatore chiaro e osservabile)
+
+Restituisci SOLO JSON:
+{{
+  "scores": {{
+    "specificita": 1-10,
+    "intercambiabilita": 1-10,
+    "punto_rottura": 1-10,
+    "protezione_fallimento": 1-10,
+    "verificabilita": 1-10
+  }},
+  "media": 1-10,
+  "criteri_falliti": ["nomi dei criteri con score < 6"],
+  "feedback": "cosa manca o va migliorato nella risposta (max 2 frasi)",
+  "is_valid": true/false
+}}
+
+La risposta è valida (is_valid=true) se al massimo 1 criterio è sotto 6 E la media è >= 6.""", max_tokens=600)
+
+    if result:
+        is_valid = result.get('is_valid', True)
+        scores = result.get('scores', {})
+        media = result.get('media', 0)
+        failed = result.get('criteri_falliti', [])
+        feedback = result.get('feedback', '')
+
+        s['validation_history'].append({
+            'scores': scores,
+            'media': media,
+            'failed': failed,
+            'is_valid': is_valid,
+        })
+
+        log("validator", f"Media: {media}/10 | Falliti: {failed} | Valido: {is_valid}")
+        if feedback:
+            log("validator", f"Feedback: {feedback[:150]}")
+
+        return is_valid, feedback, scores
+
+    log("validator", "Errore nella validazione — accetta risposta")
+    return True, None, None
+
 
 # =========================================================================
 # ERRORI
@@ -502,6 +698,32 @@ def chat(user_input):
 
     assistant_reply = strip_process_blocks(assistant_reply)
 
+    # === VALIDATORE POST-RISPOSTA ===
+    # Valida solo in gate 3 (quando c'è prescrizione reale)
+    if s['gate'] >= 3:
+        is_valid, feedback, scores = validate_response(user_input, assistant_reply)
+
+        if not is_valid and feedback:
+            log("validator", "Risposta BOCCIATA — rigenero con feedback")
+
+            # Rigenera con il feedback del validatore iniettato
+            try:
+                regen_system, regen_messages = build_messages(user_input)
+                regen_system += f"\n\n=== FEEDBACK VALIDATORE (la tua risposta precedente è stata bocciata) ===\n"
+                regen_system += f"Problemi: {feedback}\n"
+                regen_system += "Riscrivi la risposta correggendo questi problemi. Non ripetere gli stessi errori.\n"
+
+                regen_response = claude.messages.create(
+                    model="claude-sonnet-4-5",
+                    max_tokens=4096,
+                    system=regen_system,
+                    messages=regen_messages
+                )
+                assistant_reply = strip_process_blocks(regen_response.content[0].text)
+                log("validator", "Risposta RIGENERATA con successo")
+            except Exception as e:
+                log("validator", f"Errore rigenerazione: {e} — uso risposta originale")
+
     # Aggiungi alla conversazione (evita duplicati dal gate check)
     if not s['conversation'] or s['conversation'][-1].get('content') != user_input:
         s['conversation'].append({'role': 'user', 'content': user_input})
@@ -535,7 +757,15 @@ if __name__ == '__main__':
             reply = chat(user_input)
             s = get_session()
             print(f"\nCoach: {reply}")
-            print(f"\n[Gate: {s['gate']} | Retrieval: {s['retrieval_done']} | Diagnosi: {'Sì' if s.get('diagnosis') else 'No'}]\n")
+            bdm_info = ""
+            if s.get('bdm_mapping') and s['bdm_mapping'].get('patterns'):
+                top = s['bdm_mapping']['patterns'][0]
+                bdm_info = f" | BDM: {top['bdm_id']} ({top['probability']}%)"
+            val_info = ""
+            if s.get('validation_history'):
+                last = s['validation_history'][-1]
+                val_info = f" | Qualità: {last['media']}/10"
+            print(f"\n[Gate: {s['gate']}{bdm_info} | Retrieval: {s['retrieval_done']} | Diagnosi: {'Sì' if s.get('diagnosis') else 'No'}{val_info}]\n")
         except KeyboardInterrupt:
             print("\nInterrotto.")
             break
