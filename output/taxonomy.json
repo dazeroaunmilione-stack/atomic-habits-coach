@@ -1,0 +1,61 @@
+{
+  "primary_domain": {
+    "foundations_of_habit_change": "Principi sistemici: compounding, sistemi vs obiettivi, miglioramento progressivo",
+    "identity_and_self_model": "Identità, credenze, immagine di sé, conflitto identitario, evidenza comportamentale",
+    "behavior_psychology_and_learning": "Meccanismi psicologici: apprendimento, scorciatoie mentali, carico cognitivo",
+    "habit_loop_and_behavior_architecture": "Ciclo cue-craving-response-reward, architettura del comportamento",
+    "behavior_design_and_four_laws": "Framework 4 leggi: obvious, attractive, easy, satisfying + inversione",
+    "cue_and_environment_design": "Segnali, visibilità, ambiente, architettura delle scelte, contesto fisico",
+    "motivation_and_desire_dynamics": "Craving, tentazione, anticipazione, desiderio, reward rivali",
+    "response_friction_and_execution": "Frizione, facilità esecutiva, two-minute rule, riduzione barriere",
+    "reward_and_reinforcement": "Ricompensa, gratificazione immediata, rinforzo, tracking come reward",
+    "repetition_automation_and_stability": "Ripetizione, automatismo, consolidamento, frequenza",
+    "self_observation_and_behavior_awareness": "Auto-osservazione, consapevolezza, pointing-and-calling, habit scorecard",
+    "planning_and_behavior_initiation": "Implementation intention, habit stacking, pianificazione avvio",
+    "measurement_tracking_and_feedback": "Tracking, misurazione, feedback, habit tracker, paper clip strategy",
+    "social_influence_and_accountability": "Influenza sociale, imitazione, accountability partner, gruppo",
+    "maintenance_recovery_and_optimization": "Mantenimento, recovery, never miss twice, ottimizzazione, review",
+    "advanced_integration_and_mastery": "Integrazione avanzata, mastery, deliberate practice, Goldilocks Rule"
+  },
+  "topic_type": [
+    "principle", "model", "framework", "mechanism", "method", "tactic",
+    "implementation_guide", "exercise", "diagnostic_lens", "awareness_tool",
+    "corrective_strategy", "integration_module", "review_module"
+  ],
+  "functional_role": [
+    "establish_foundation", "explain_mechanism", "reframe_problem",
+    "provide_framework", "design_trigger", "design_context",
+    "increase_desirability", "reduce_friction", "reinforce_behavior",
+    "strengthen_repetition", "increase_awareness", "guide_behavior_start",
+    "support_tracking", "leverage_social_pressure", "repair_consistency",
+    "shift_identity", "diagnose_behavior_block", "remove_temptation",
+    "integrate_multiple_levers", "optimize_system"
+  ],
+  "behavior_change_stage": [
+    "awareness", "diagnosis", "design", "initiation", "early_repetition",
+    "identity_shift", "consolidation", "maintenance", "recovery",
+    "optimization", "mastery"
+  ],
+  "user_language_mapping": {
+    "me ne dimentico": {"domain": "cue_and_environment_design", "stage": "design", "bdm_hint": "BD01"},
+    "non ho un momento fisso": {"domain": "planning_and_behavior_initiation", "stage": "design", "bdm_hint": "BD02"},
+    "quando cambia la giornata": {"domain": "cue_and_environment_design", "stage": "design", "bdm_hint": "BD03"},
+    "è più forte di me": {"domain": "motivation_and_desire_dynamics", "stage": "diagnosis", "bdm_hint": "BD04"},
+    "non ho voglia": {"domain": "motivation_and_desire_dynamics", "stage": "diagnosis", "bdm_hint": "BD06"},
+    "troppo difficile": {"domain": "response_friction_and_execution", "stage": "design", "bdm_hint": "BD09"},
+    "non riesco a ricominciare": {"domain": "maintenance_recovery_and_optimization", "stage": "recovery", "bdm_hint": "BD19"},
+    "ci provo ma mollo": {"domain": "reward_and_reinforcement", "stage": "early_repetition", "bdm_hint": "BD14"},
+    "non vedo risultati": {"domain": "reward_and_reinforcement", "stage": "consolidation", "bdm_hint": "BD15"},
+    "non sono quel tipo di persona": {"domain": "identity_and_self_model", "stage": "identity_shift", "bdm_hint": "BD12"},
+    "troppo da fare": {"domain": "response_friction_and_execution", "stage": "design", "bdm_hint": "BD13"},
+    "lo faccio per un po poi smetto": {"domain": "maintenance_recovery_and_optimization", "stage": "maintenance", "bdm_hint": "BD17"},
+    "mi annoio": {"domain": "motivation_and_desire_dynamics", "stage": "consolidation", "bdm_hint": "BD23"},
+    "perdo la motivazione": {"domain": "motivation_and_desire_dynamics", "stage": "consolidation", "bdm_hint": "BD06"},
+    "non ho tempo": {"domain": "response_friction_and_execution", "stage": "design", "bdm_hint": "BD13"},
+    "ci provo quando capita": {"domain": "planning_and_behavior_initiation", "stage": "design", "bdm_hint": "BD02"},
+    "mi giudico troppo": {"domain": "identity_and_self_model", "stage": "identity_shift", "bdm_hint": "BD12"},
+    "dopo una volta che salto è finita": {"domain": "maintenance_recovery_and_optimization", "stage": "recovery", "bdm_hint": "BD19"},
+    "so cosa devo fare ma non lo faccio": {"domain": "response_friction_and_execution", "stage": "diagnosis", "bdm_hint": "BD09"},
+    "funzionava ma ora non più": {"domain": "maintenance_recovery_and_optimization", "stage": "recovery", "bdm_hint": "BD17"}
+  }
+}
