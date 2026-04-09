@@ -723,6 +723,8 @@ if 'current_session_id' not in st.session_state:
     st.session_state.current_session_id = None
 if 'feedback_map' not in st.session_state:
     st.session_state.feedback_map = {}
+if 'last_audio_id' not in st.session_state:
+    st.session_state.last_audio_id = None
 
 # ─────────────────────────────────────────────────────────────────────────
 # SIDEBAR
@@ -878,20 +880,26 @@ if agent_s['gate'] >= 3 and st.session_state.messages:
 # ─────────────────────────────────────────────────────────────────────────
 # AUDIO INPUT
 # ─────────────────────────────────────────────────────────────────────────
-audio_col1, audio_col2 = st.columns([0.85, 0.15])
-with audio_col2:
-    try:
-        audio_data = st.audio_input("🎤", key="audio_input", label_visibility="collapsed")
-        if audio_data:
-            audio_bytes = audio_data.getvalue()
-            if audio_bytes and len(audio_bytes) > 100:
-                with st.spinner("Trascrizione..."):
+try:
+    audio_data = st.audio_input("Registra un messaggio vocale", key="audio_input",
+                                 label_visibility="collapsed")
+    if audio_data:
+        # Usa hash del contenuto per evitare re-processing dello stesso audio
+        audio_bytes = audio_data.getvalue()
+        if audio_bytes and len(audio_bytes) > 100:
+            import hashlib
+            audio_hash = hashlib.md5(audio_bytes).hexdigest()
+            if audio_hash != st.session_state.last_audio_id:
+                st.session_state.last_audio_id = audio_hash
+                with st.spinner("Trascrizione in corso..."):
                     transcription = transcribe_audio(audio_bytes)
                 if transcription:
                     st.session_state._pending_prompt = transcription
                     st.rerun()
-    except Exception:
-        pass  # st.audio_input non disponibile in questa versione
+                else:
+                    st.warning("Non sono riuscito a trascrivere l'audio. Riprova.")
+except Exception:
+    pass  # st.audio_input non disponibile in questa versione di Streamlit
 
 # ─────────────────────────────────────────────────────────────────────────
 # CHAT INPUT + PROCESSING
