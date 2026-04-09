@@ -687,24 +687,48 @@ def render_recap_card(session):
 
 def transcribe_audio(audio_bytes):
     """Trascrive audio usando OpenAI Whisper."""
+    import tempfile, os
+    tmp_path = None
     try:
         from openai import OpenAI
-        import tempfile, os
-        client = OpenAI(api_key=st.secrets.get('OPENAI_API_KEY', os.getenv('OPENAI_API_KEY')))
-        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+        api_key = None
+        try:
+            api_key = st.secrets['OPENAI_API_KEY']
+        except Exception:
+            api_key = os.getenv('OPENAI_API_KEY')
+
+        if not api_key:
+            st.warning("Chiave OpenAI non configurata per la trascrizione vocale.")
+            return None
+
+        client = OpenAI(api_key=api_key)
+
+        # Streamlit audio_input restituisce WebM — Whisper accetta webm, mp3, wav, m4a
+        tmp_path = tempfile.mktemp(suffix='.webm')
+        with open(tmp_path, 'wb') as f:
             f.write(audio_bytes)
-            f.flush()
-            with open(f.name, 'rb') as audio_file:
-                transcript = client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    language="it"
-                )
-            os.unlink(f.name)
-            return transcript.text
+
+        with open(tmp_path, 'rb') as audio_file:
+            transcript = client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language="it"
+            )
+        return transcript.text if transcript and transcript.text else None
+
     except Exception as e:
-        st.error(f"Errore trascrizione: {e}")
+        error_msg = str(e)
+        if 'too large' in error_msg.lower() or 'size' in error_msg.lower():
+            st.warning("Audio troppo lungo. Prova con un messaggio piu breve (max 30 secondi).")
+        else:
+            st.warning(f"Errore trascrizione: {error_msg[:100]}")
         return None
+    finally:
+        if tmp_path and os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
 
 
 def format_session_date(iso_str):
