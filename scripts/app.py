@@ -544,13 +544,28 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
     background: rgba(196, 163, 90, 0.06) !important;
 }
 
-/* Audio input styling */
+/* Audio input — stessa larghezza e stile della chat input */
+.stAudioInput {
+    max-width: 560px !important;
+    margin: 0 auto !important;
+}
 .stAudioInput > div {
-    border-radius: 16px !important;
+    border-radius: 50px !important;
     border: 1.5px solid #E8E4DC !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.03) !important;
+    padding: 0.15rem 0.4rem !important;
+    min-height: 0 !important;
+    height: 38px !important;
+    overflow: hidden !important;
 }
 .stAudioInput > div > div {
     background: transparent !important;
+    min-height: 0 !important;
+}
+.stAudioInput audio { height: 28px !important; }
+.stAudioInput button {
+    transform: scale(0.8) !important;
 }
 
 /* === MOBILE === */
