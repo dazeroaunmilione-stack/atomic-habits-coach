@@ -544,15 +544,15 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
     background: rgba(196, 163, 90, 0.06) !important;
 }
 
-/* Audio input — bordi oro, trasparente, esile */
+/* Audio input — scuro con dettagli bianchi */
 .stAudioInput {
     max-width: 560px !important;
     margin: -0.5rem auto 0.5rem auto !important;
 }
 .stAudioInput > div {
     border-radius: 50px !important;
-    border: 1.5px solid #C4A35A !important;
-    background: transparent !important;
+    border: none !important;
+    background: #2C2C2C !important;
     box-shadow: none !important;
     padding: 0.1rem 0.3rem !important;
     min-height: 0 !important;
@@ -565,11 +565,14 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
 }
 .stAudioInput audio {
     height: 26px !important;
-    opacity: 0.7 !important;
+    filter: invert(1) !important;
 }
 .stAudioInput button {
     transform: scale(0.75) !important;
-    color: #C4A35A !important;
+    color: #FFFFFF !important;
+}
+.stAudioInput p, .stAudioInput span, .stAudioInput label {
+    color: #FFFFFF !important;
 }
 
 /* === MOBILE === */
