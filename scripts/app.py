@@ -557,11 +557,13 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
 @media (max-width: 768px) {
     .coach-title { font-size: 2.4rem !important; }
     .bubble { max-width: 88% !important; font-size: 0.83rem !important; }
-    .main .block-container { padding: 0 1rem 12rem 1rem !important; }
+    .main .block-container { max-width: 100% !important; padding: 0 1rem 12rem 1rem !important; }
     [data-testid="stChatInput"] { left: 0 !important; padding-bottom: 3.5rem !important; }
     .gate-bar { max-width: 260px; }
     .recap-card { padding: 1.2rem; }
     .feedback-row { margin-left: 0; }
+    /* Fix #16: audio input full width on mobile */
+    .stAudioInput { width: 100% !important; }
 }
 
 /* === SCROLLBAR === */
@@ -792,13 +794,27 @@ with st.sidebar:
                         m.get('id'): m.get('feedback')
                         for m in stored_messages if m.get('feedback')
                     }
-                    # Rebuild agent conversation
+                    # Fix #6: rebuild completo dello stato agente
                     agent_session = get_session()
                     for m in st.session_state.messages:
                         agent_session['conversation'].append({
                             'role': m['role'], 'content': m['content']
                         })
                     agent_session['gate'] = sess.get('gate', 0)
+                    # Se gate >= 2, riesegui BDM mapping dalla conversazione
+                    if agent_session['gate'] >= 2 and len(agent_session['conversation']) >= 4:
+                        try:
+                            from agent import map_bdm_patterns
+                            map_bdm_patterns()
+                        except Exception:
+                            pass
+                    # Se gate >= 3, riesegui micro-gate per ricostruire diagnosis
+                    if agent_session['gate'] >= 3 and len(agent_session['conversation']) >= 6:
+                        try:
+                            from agent import validate_micro_gate
+                            validate_micro_gate()
+                        except Exception:
+                            pass
                     st.rerun()
             with col_d:
                 if st.button("x", key=f"del_{sess['id']}", help="Elimina"):
@@ -902,35 +918,39 @@ if agent_s['gate'] >= 3 and st.session_state.messages:
         st.markdown(recap_html, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────────────────────────────────
-# AUDIO INPUT
+# AUDIO INPUT (full width come la chat input)
 # ─────────────────────────────────────────────────────────────────────────
 try:
-    audio_data = st.audio_input("Registra un messaggio vocale", key="audio_input",
-                                 label_visibility="collapsed")
+    audio_data = st.audio_input("Oppure registra un messaggio vocale",
+                                key="audio_input")
     if audio_data:
-        # Usa hash del contenuto per evitare re-processing dello stesso audio
+        import hashlib
         audio_bytes = audio_data.getvalue()
         if audio_bytes and len(audio_bytes) > 100:
-            import hashlib
             audio_hash = hashlib.md5(audio_bytes).hexdigest()
             if audio_hash != st.session_state.last_audio_id:
                 st.session_state.last_audio_id = audio_hash
                 with st.spinner("Trascrizione in corso..."):
-                    transcription = transcribe_audio(audio_bytes)
+                    try:
+                        transcription = transcribe_audio(audio_bytes)
+                    except Exception as e:
+                        transcription = None
+                        st.warning(f"Errore durante la trascrizione: {str(e)[:80]}")
                 if transcription:
                     st.session_state._pending_prompt = transcription
                     st.rerun()
-                else:
-                    st.warning("Non sono riuscito a trascrivere l'audio. Riprova.")
+                elif transcription is None and not st.session_state.get('_audio_error_shown'):
+                    st.session_state._audio_error_shown = True
 except Exception:
-    pass  # st.audio_input non disponibile in questa versione di Streamlit
+    pass
 
 # ─────────────────────────────────────────────────────────────────────────
 # CHAT INPUT + PROCESSING
 # ─────────────────────────────────────────────────────────────────────────
 
-# Check for pending prompt (from chips or audio)
+# Fix #17: safe pop — salva prima di consumare, così se crasha possiamo recuperare
 pending = st.session_state.pop('_pending_prompt', None)
+st.session_state._audio_error_shown = False  # reset error flag
 
 prompt = pending or st.chat_input("Descrivi il tuo caso...")
 
@@ -966,10 +986,13 @@ if prompt:
     asst_msg_id = save_message(sid, 'assistant', reply)
     st.session_state.messages.append({"role": "assistant", "content": reply, "id": asst_msg_id})
 
-    # Update session title and gate
+    # Fix #12: sincronizza gate e titolo IMMEDIATAMENTE dopo la risposta
     agent_s = get_session()
-    update_session(sid, gate=agent_s['gate'])
-    if len(st.session_state.messages) == 2:
-        update_session(sid, title=prompt[:60].strip())
+    try:
+        update_session(sid, gate=agent_s['gate'])
+        if len(st.session_state.messages) == 2:
+            update_session(sid, title=prompt[:60].strip())
+    except Exception as e:
+        pass  # non bloccare il flusso se il DB non risponde
 
     st.rerun()

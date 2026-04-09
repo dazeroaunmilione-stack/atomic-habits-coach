@@ -95,12 +95,15 @@ def _default_session():
         'gate': 0,
         'conversation': [],
         'areas_status': {},
+        'taxonomy_hints': None,       # Fix #4: incluso in default
         'bdm_mapping': None,
+        'bdm_mapping_attempts': 0,    # Fix #11: retry counter
         'diagnosis': None,
         'micro_gate_result': None,
         'retrieval_done': False,
         'retrieved_modules': None,
         'validation_history': [],
+        '_embedding_cache': {},        # Fix #10: memoization retrieval
     }
 
 def get_session():
@@ -388,7 +391,17 @@ def retrieve_modules(query, top_k=5, filter_metadata=None):
         log("retrieval", "Pinecone non disponibile, skip retrieval")
         return []
     try:
-        embedding = get_embedding(query)
+        # Fix #10: memoization embedding per evitare chiamate doppie
+        s = get_session()
+        cache = s.get('_embedding_cache', {})
+        cache_key = query[:200]  # usa i primi 200 char come chiave
+        if cache_key in cache:
+            embedding = cache[cache_key]
+        else:
+            embedding = get_embedding(query)
+            cache[cache_key] = embedding
+            s['_embedding_cache'] = cache
+
         results = pinecone_index.query(
             vector=embedding,
             top_k=top_k,
@@ -510,7 +523,7 @@ def run_retrieval_if_needed():
 
     # === NORMALIZZAZIONE TASSONOMICA del retrieval ===
     taxonomy_context = ""
-    if TAXONOMY_AVAILABLE and s.get('bdm_mapping'):
+    if TAXONOMY_AVAILABLE and s.get('bdm_mapping') and len(s['bdm_mapping'].get('patterns', [])) > 0:  # Fix #5
         top_pattern = s['bdm_mapping']['patterns'][0]
         bdm_id = top_pattern['bdm_id']
         # Trova il dominio tassonomico del pattern dominante
@@ -550,24 +563,19 @@ def run_retrieval_if_needed():
 # GATE LOGIC
 # =========================================================================
 
-def check_gate_advancement(user_message):
-    """Chiamata DOPO che il messaggio utente è stato aggiunto alla conversazione."""
+def check_gate_advancement(conversation):
+    """Chiamata con la conversazione GIÀ contenente il messaggio utente.
+    Fix #1: niente più temp_added — il messaggio è già nella conversation."""
     s = get_session()
+    user_turns = [m for m in conversation if m['role'] == 'user']
+    if not user_turns:
+        return
 
-    # Aggiungi il messaggio utente PRIMA del check (così i conteggi sono corretti)
-    # NOTA: il messaggio viene aggiunto qui temporaneamente per il check,
-    # poi viene ri-aggiunto alla fine di chat() — preveniamo duplicati
-    temp_added = False
-    if not s['conversation'] or s['conversation'][-1].get('content') != user_message:
-        s['conversation'].append({'role': 'user', 'content': user_message})
-        temp_added = True
-
-    user_turns = [m for m in s['conversation'] if m['role'] == 'user']
+    last_user_msg = user_turns[-1]['content']
 
     # Gate 0→1: primo turno + normalizzazione tassonomica
     if s['gate'] == 0:
-        # Tassonomia a Gate 0: boundary check terminologico (Governance §4)
-        tax_hints = normalize_with_taxonomy(user_message)
+        tax_hints = normalize_with_taxonomy(last_user_msg)
         if tax_hints:
             s['taxonomy_hints'] = tax_hints
             structured_log('taxonomy_boundary_check', gate=0, layer='Tassonomia',
@@ -575,14 +583,20 @@ def check_gate_advancement(user_message):
                            next_action='continue_inquiry')
         s['gate'] = 1
         log("gate", "0 → 1: primo messaggio ricevuto")
-        if temp_added: s['conversation'].pop()
         return
 
     # Gate 1→2: verifica copertura aree dopo almeno 2 turni utente
     if s['gate'] == 1 and len(user_turns) >= 2:
         assessment = assess_area_coverage()
         if assessment.get('gate_ready'):
-            # BDM MAPPING OBBLIGATORIO: mappa il caso su 2-3 pattern prima di avanzare
+            # Fix #3: resetta bdm_mapping prima di rimappare
+            s['bdm_mapping'] = None
+            # Fix #11: max 3 tentativi BDM mapping
+            if s['bdm_mapping_attempts'] >= 3:
+                log("gate", "1: BDM mapping fallito 3 volte — bypass, avanza a gate 2 senza mapping")
+                s['gate'] = 2
+                return
+            s['bdm_mapping_attempts'] += 1
             bdm_result = map_bdm_patterns()
             if bdm_result:
                 s['gate'] = 2
@@ -592,7 +606,7 @@ def check_gate_advancement(user_message):
                                next_action='continue_diagnosis')
                 log("gate", "1 → 2: aree coperte + BDM mapping completato")
             else:
-                log("gate", "1: aree coperte ma BDM mapping fallito — resta in gate 1")
+                log("gate", f"1: BDM mapping fallito (tentativo {s['bdm_mapping_attempts']}/3)")
         else:
             log("gate", f"1: aree incomplete — {s.get('areas_status', {})}")
 
@@ -613,9 +627,6 @@ def check_gate_advancement(user_message):
         else:
             reason = s.get('micro_gate_result', {}).get('reason', 'motivo sconosciuto')
             log("gate", f"2: micro-gate NON superato — {reason}")
-
-    # Rimuovi il messaggio temporaneo (verrà aggiunto alla fine di chat())
-    if temp_added: s['conversation'].pop()
 
 # =========================================================================
 # COSTRUZIONE PROMPT
@@ -675,7 +686,29 @@ def build_messages(user_input):
 
     if s['gate'] >= 3:
         gate_context += "\nMicro-gate superato. Hai accesso a BDM completo e Knowledge base.\n"
-        gate_context += format_bdm_for_prompt(3)
+        # Fix #9: inietta solo i pattern rilevanti (dominante + rivale), non tutti e 30
+        diagnosis = s.get('diagnosis', {})
+        relevant_ids = set()
+        if diagnosis.get('dominant_bdm'):
+            relevant_ids.add(diagnosis['dominant_bdm'])
+        if diagnosis.get('rival_bdm'):
+            relevant_ids.add(diagnosis['rival_bdm'])
+        bdm_map = s.get('bdm_mapping')
+        if bdm_map and bdm_map.get('patterns'):
+            for p in bdm_map['patterns']:
+                relevant_ids.add(p.get('bdm_id'))
+        if relevant_ids:
+            lines = ["=== GUIDA DIAGNOSTICA (pattern rilevanti) ==="]
+            for p in BDM_POST:
+                if p.get('diagnosis_id') in relevant_ids:
+                    lines.append(f"\n{p['diagnosis_id']}: {p['problem_pattern']}")
+                    lines.append(f"  Fase: {p.get('likely_behavior_phase', '')}")
+                    lines.append(f"  Causa: {p.get('likely_root_cause', '')}")
+                    lines.append(f"  Tecniche: {p.get('recommended_techniques', '')}")
+                    lines.append(f"  Moduli: {p.get('recommended_modules', '')}")
+            gate_context += '\n'.join(lines)
+        else:
+            gate_context += format_bdm_for_prompt(3)
 
         # Inietta anche BDM mapping in gate 3 per coerenza
         bdm_map = s.get('bdm_mapping')
@@ -710,8 +743,8 @@ def build_messages(user_input):
 
     full_system = SYSTEM_PROMPT + gate_context
 
+    # Fix #1: conversation contiene già il messaggio utente (aggiunto in chat())
     messages = s['conversation'].copy()
-    messages.append({'role': 'user', 'content': user_input})
 
     return full_system, messages
 
@@ -731,7 +764,7 @@ def validate_response(user_input, assistant_reply):
 
     bdm_map = s.get('bdm_mapping', {})
     bdm_context = ""
-    if bdm_map and bdm_map.get('patterns'):
+    if bdm_map and bdm_map.get('patterns') and len(bdm_map['patterns']) > 0:  # Fix #5
         bdm_context = f"Pattern dominante: {bdm_map['patterns'][0]['bdm_id']} — {bdm_map['patterns'][0]['pattern_name']}"
 
     diagnosis = s.get('diagnosis', {})
@@ -792,12 +825,15 @@ La risposta è valida (is_valid=true) se al massimo 1 criterio è sotto 6 E la m
         failed = result.get('criteri_falliti', [])
         feedback = result.get('feedback', '')
 
+        # Fix #2: limite validation_history a ultimi 10 risultati
         s['validation_history'].append({
             'scores': scores,
             'media': media,
             'failed': failed,
             'is_valid': is_valid,
         })
+        if len(s['validation_history']) > 10:
+            s['validation_history'] = s['validation_history'][-10:]
 
         log("validator", f"Media: {media}/10 | Falliti: {failed} | Valido: {is_valid}")
         if feedback:
@@ -827,8 +863,11 @@ _ERROR_MESSAGES = {
 def chat(user_input):
     s = get_session()
 
+    # Fix #1: aggiungi il messaggio utente UNA sola volta, PRIMA di tutto
+    s['conversation'].append({'role': 'user', 'content': user_input})
+
     try:
-        check_gate_advancement(user_input)
+        check_gate_advancement(s['conversation'])
     except Exception as e:
         log("gate", f"Errore: {e}")
 
@@ -887,9 +926,8 @@ def chat(user_input):
             except Exception as e:
                 log("validator", f"Errore rigenerazione: {e} — uso risposta originale")
 
-    # Aggiungi alla conversazione (evita duplicati dal gate check)
-    if not s['conversation'] or s['conversation'][-1].get('content') != user_input:
-        s['conversation'].append({'role': 'user', 'content': user_input})
+    # Fix #1: messaggio utente già aggiunto all'inizio di chat()
+    # Aggiungi solo la risposta dell'assistente
     s['conversation'].append({'role': 'assistant', 'content': assistant_reply})
 
     return assistant_reply
