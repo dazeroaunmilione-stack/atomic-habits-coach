@@ -128,7 +128,7 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
 /* === MAIN CONTAINER === */
 .main .block-container {
     max-width: 740px !important;
-    padding: 0 1.5rem 10rem 1.5rem !important;
+    padding: 0 1.5rem 14rem 1.5rem !important;
     margin: 0 auto !important;
 }
 
@@ -544,12 +544,21 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
     background: rgba(196, 163, 90, 0.06) !important;
 }
 
-/* Audio input — scuro con dettagli bianchi */
+/* Audio input — fisso in basso sopra la chat input */
 .stAudioInput {
-    max-width: 560px !important;
-    margin: -0.5rem auto 0.5rem auto !important;
+    position: fixed !important;
+    bottom: 60px !important;
+    left: 280px !important;
+    right: 0 !important;
+    z-index: 997 !important;
+    display: flex !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    background: transparent !important;
 }
 .stAudioInput > div {
+    max-width: 560px !important;
+    width: 100% !important;
     border-radius: 50px !important;
     border: none !important;
     background: #2C2C2C !important;
@@ -579,13 +588,12 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
 @media (max-width: 768px) {
     .coach-title { font-size: 2.4rem !important; }
     .bubble { max-width: 88% !important; font-size: 0.83rem !important; }
-    .main .block-container { max-width: 100% !important; padding: 0 1rem 12rem 1rem !important; }
+    .main .block-container { max-width: 100% !important; padding: 0 1rem 16rem 1rem !important; }
     [data-testid="stChatInput"] { left: 0 !important; padding-bottom: 3.5rem !important; }
     .gate-bar { max-width: 260px; }
     .recap-card { padding: 1.2rem; }
     .feedback-row { margin-left: 0; }
-    /* Fix #16: audio input full width on mobile */
-    .stAudioInput { width: 100% !important; }
+    .stAudioInput { left: 0 !important; }
 }
 
 /* === SCROLLBAR === */
