@@ -408,7 +408,7 @@ def retrieve_modules(query, top_k=5, filter_metadata=None):
             include_metadata=True,
             filter=filter_metadata
         )
-        return results.matches
+        return results.matches if results and hasattr(results, 'matches') else []
     except Exception as e:
         log("retrieval", f"Errore Pinecone: {e}")
         return []
@@ -913,11 +913,13 @@ def chat(user_input):
     assistant_reply = strip_process_blocks(assistant_reply)
 
     # === VALIDATORE POST-RISPOSTA ===
-    # Valida solo in gate 3 (quando c'è prescrizione reale)
-    if s['gate'] >= 3:
+    # Valida solo in gate 3 (quando c'è prescrizione reale), max 1 rigenerazione
+    already_regenerated = False
+    if s['gate'] >= 3 and not already_regenerated:
         is_valid, feedback, scores = validate_response(user_input, assistant_reply)
 
         if not is_valid and feedback:
+            already_regenerated = True
             log("validator", "Risposta BOCCIATA — rigenero con feedback")
 
             # Rigenera con il feedback del validatore iniettato
