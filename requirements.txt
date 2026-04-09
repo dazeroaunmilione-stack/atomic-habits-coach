@@ -4,5 +4,6 @@ pinecone
 python-dotenv
 openpyxl
 PyMuPDF
-streamlit
+streamlit>=1.33.0
 reportlab
+supabase
