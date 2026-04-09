@@ -544,17 +544,18 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
     background: rgba(196, 163, 90, 0.06) !important;
 }
 
-/* Audio input — fisso in basso sopra la chat input */
+/* Audio input — fisso sopra la chat input */
 .stAudioInput {
     position: fixed !important;
-    bottom: 60px !important;
+    bottom: 72px !important;
     left: 280px !important;
     right: 0 !important;
-    z-index: 997 !important;
+    z-index: 999 !important;
     display: flex !important;
     justify-content: center !important;
     padding: 0 !important;
     background: transparent !important;
+    pointer-events: none !important;
 }
 .stAudioInput > div {
     max-width: 560px !important;
@@ -562,11 +563,12 @@ section[data-testid="stSidebar"] [data-testid="stMarkdown"] p {
     border-radius: 50px !important;
     border: none !important;
     background: #2C2C2C !important;
-    box-shadow: none !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.15) !important;
     padding: 0.1rem 0.3rem !important;
     min-height: 0 !important;
-    height: 36px !important;
+    height: 34px !important;
     overflow: hidden !important;
+    pointer-events: all !important;
 }
 .stAudioInput > div > div {
     background: transparent !important;

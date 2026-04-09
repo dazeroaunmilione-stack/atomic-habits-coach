@@ -610,9 +610,27 @@ def check_gate_advancement(conversation):
         else:
             log("gate", f"1: aree incomplete — {s.get('areas_status', {})}")
 
+    # Rileva segnali di "non ho altro da dire" — forza avanzamento
+    _PROCEED_SIGNALS = [
+        "non ho altro", "penso di averti detto tutto", "ho detto tutto",
+        "non saprei cos'altro", "procedi", "vai avanti", "basta domande",
+        "non mi viene in mente altro", "è tutto", "non so cos'altro dirti",
+    ]
+    user_wants_to_proceed = any(sig in last_user_msg.lower() for sig in _PROCEED_SIGNALS)
+
     # Gate 2→3: MICRO-GATE REALE
-    if s['gate'] == 2 and len(user_turns) >= 3:
+    if s['gate'] == 2 and (len(user_turns) >= 3 or user_wants_to_proceed):
         passed = validate_micro_gate()
+        # Se l'utente chiede esplicitamente di procedere, forza il gate
+        if not passed and user_wants_to_proceed:
+            log("gate", "2 → 3: utente chiede di procedere — forza avanzamento con materiale disponibile")
+            passed = True
+            s['diagnosis'] = s.get('diagnosis') or {
+                'dominant': 'Diagnosi basata su materiale parziale (utente ha chiesto di procedere)',
+                'rival': None,
+                'dominant_bdm': s.get('bdm_mapping', {}).get('patterns', [{}])[0].get('bdm_id') if s.get('bdm_mapping') else None,
+                'rival_bdm': None,
+            }
         if passed:
             s['gate'] = 3
             diagnosis = s.get('diagnosis', {})
@@ -683,6 +701,12 @@ def build_messages(user_input):
         mgr = s.get('micro_gate_result')
         if mgr and not mgr.get('gate_passed'):
             gate_context += f"\n\n=== MICRO-GATE NON SUPERATO ===\nMotivo: {mgr.get('reason', '-')}\nDevi continuare l'inquiry o la diagnosi prima di prescrivere.\n"
+
+        # Istruzione flessibilità: se l'utente dice "non ho altro", procedi
+        gate_context += "\n=== REGOLA DI FLESSIBILITÀ ===\n"
+        gate_context += "Se l'utente dice che non ha altro da aggiungere, non insistere con le stesse domande.\n"
+        gate_context += "Procedi alla diagnosi con il materiale disponibile. È meglio una diagnosi con materiale parziale "
+        gate_context += "che forzare l'utente a rispondere a domande che non sa come approfondire.\n"
 
     if s['gate'] >= 3:
         gate_context += "\nMicro-gate superato. Hai accesso a BDM completo e Knowledge base.\n"
